@@ -2,7 +2,7 @@
 
 import { Trace } from '../core/entities/trace';
 import { ExportResult } from '@opentelemetry/core';
-import { Span as OTelSpan, SpanProcessor, ReadableSpan as OTelReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
+import { SpanProcessor, ReadableSpan as OTelReadableSpan, SpanExporter, Span as OTelSpan } from '@opentelemetry/sdk-trace-node';
 import { Context } from '@opentelemetry/api';
 import { InMemoryTraceManager } from '../core/trace_manager';
 import { TraceInfo } from '../core/entities/trace_info';
@@ -49,7 +49,7 @@ export class MlflowSpanProcessor implements SpanProcessor {
 
     let traceId: string;
 
-    if (!span.parentSpanId) {
+    if (!span.parentSpanContext) {
       // This is a root span
       traceId = generateTraceId(span);
       const trace_info = new TraceInfo({
@@ -84,7 +84,7 @@ export class MlflowSpanProcessor implements SpanProcessor {
    */
   onEnd(span: OTelReadableSpan): void {
     // Only trigger trace export for root span completion
-    if (span.parentSpanId) {
+    if (span.parentSpanContext) {
       return;
     }
 
@@ -139,7 +139,7 @@ export class MlflowSpanExporter implements SpanExporter {
   ): void {
     for (const span of spans) {
       // Only export root spans
-      if (span.parentSpanId) {
+      if (span.parentSpanContext) {
         continue;
       }
 

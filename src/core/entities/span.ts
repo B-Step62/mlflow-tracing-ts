@@ -1,9 +1,8 @@
 import { NonRecordingSpan } from '@opentelemetry/api/build/src/trace/NonRecordingSpan';
-import { Span as OTelSpan } from '@opentelemetry/sdk-trace-base';
+import { Span as OTelSpan } from '@opentelemetry/sdk-trace-node';
 import { SpanAttributeKey, SpanType, NO_OP_SPAN_TRACE_ID } from '../constants';
 import { SpanEvent } from './span_event';
 import { SpanStatus, SpanStatusCode } from './span_status';
-import { SpanContext } from '@opentelemetry/api';
 import { convertHrTimeToNanoSeconds, convertNanoSecondsToHrTime } from '../utils';
 /**
  * MLflow Span interface
@@ -84,7 +83,7 @@ export class Span implements ISpan {
    * Get the parent span ID
    */
   get parentId(): string | null {
-    return this._span.parentSpanId || null;
+    return this._span.parentSpanContext?.spanId || null;
   }
 
   get name(): string {
@@ -145,7 +144,6 @@ export class LiveSpan extends Span {
    * @param inputs Input data for the span
    */
   setInputs(inputs: any): void {
-    if (inputs === undefined || inputs === null) return;
     this._attributesRegistry.set(SpanAttributeKey.INPUTS, inputs);
   }
 
@@ -154,7 +152,6 @@ export class LiveSpan extends Span {
    * @param outputs Output data for the span
    */
   setOutputs(outputs: any): void {
-    if (outputs === undefined || outputs === null) return;
     this._attributesRegistry.set(SpanAttributeKey.OUTPUTS, outputs);
   }
 
@@ -406,13 +403,5 @@ export function createMlflowSpan(
     return new Span(otelSpan);
   }
 
-  if (otelSpan instanceof OTelSpan) {
-    return new LiveSpan(otelSpan, traceId, spanType as SpanType || SpanType.UNKNOWN);
-  }
-
-
-  throw new Error(
-    `The \`otelSpan\` argument must be an instance of one of valid ` +
-    `OpenTelemetry span classes, but got ${typeof otelSpan}.`
-  );
+  return new LiveSpan(otelSpan, traceId, spanType as SpanType || SpanType.UNKNOWN);
 }

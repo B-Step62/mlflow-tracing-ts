@@ -1,4 +1,4 @@
-import { startSpan } from '../../src/core/api';
+import { startSpan, withSpan } from '../../src/core/api';
 import { SpanType } from '../../src/core/constants';
 import { LiveSpan } from '../../src/core/entities/span';
 import { SpanStatus, SpanStatusCode } from '../../src/core/entities/span_status';
@@ -140,6 +140,226 @@ describe('API', () => {
       expect(trace2.data.spans[2].parentId).toBe(trace2.data.spans[0].spanId);
       expect(trace2.data.spans[3].name).toBe('child-span-3');
       expect(trace2.data.spans[3].parentId).toBe(trace2.data.spans[2].spanId);
+    });
+  });
+
+  describe('withSpan', () => {
+    describe('inline usage pattern', () => {
+      it('should execute synchronous callback and auto-set outputs', () => {
+        const result = withSpan((span) => {
+          span.setInputs({ a: 5, b: 3 });
+          return 5 + 3;  // Auto-set outputs from return value
+        });
+
+        expect(result).toBe(8);
+
+        const traces = getTraces();
+        expect(traces.length).toBe(1);
+
+        const loggedSpan = traces[0].data.spans[0];
+        expect(loggedSpan.name).toBe('span');
+        expect(loggedSpan.inputs).toEqual({ a: 5, b: 3 });
+        expect(loggedSpan.outputs).toBe(8); // Auto-set from return value
+        expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.OK);
+      });
+
+      it('should execute synchronous callback with explicit outputs', () => {
+        const result = withSpan((span) => {
+          span.setInputs({ a: 5, b: 3 });
+          const sum = 5 + 3;
+          span.setOutputs({ result: sum });
+          return sum;
+        });
+
+        expect(result).toBe(8);
+
+        const traces = getTraces();
+        expect(traces.length).toBe(1);
+
+        const loggedSpan = traces[0].data.spans[0];
+        expect(loggedSpan.outputs).toEqual({ result: 8 }); // Explicit outputs take precedence
+      });
+
+      it('should execute asynchronous callback and auto-set outputs', async () => {
+        const result = await withSpan(async (span) => {
+          span.setInputs({ delay: 100 });
+          await new Promise(resolve => setTimeout(resolve, 10));
+          const value = 'async result';
+          return value;
+        });
+
+        expect(result).toBe('async result');
+
+        const traces = getTraces();
+        expect(traces.length).toBe(1);
+
+        const loggedSpan = traces[0].data.spans[0];
+        expect(loggedSpan.inputs).toEqual({ delay: 100 });
+        expect(loggedSpan.outputs).toBe('async result');
+        expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.OK);
+      });
+
+      it('should handle synchronous errors', () => {
+        expect(() => {
+          withSpan((span) => {
+            span.setInputs({ operation: 'divide by zero' });
+            throw new Error('Division by zero');
+          });
+        }).toThrow('Division by zero');
+
+        const traces = getTraces();
+        expect(traces.length).toBe(1);
+
+        const loggedSpan = traces[0].data.spans[0];
+        expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.ERROR);
+        expect(loggedSpan.status?.description).toBe('Division by zero');
+      });
+
+      it('should handle asynchronous errors', async () => {
+        await expect(
+          withSpan(async (span) => {
+            span.setInputs({ operation: 'async error' });
+            await new Promise(resolve => setTimeout(resolve, 10));
+            throw new Error('Async error');
+          })
+        ).rejects.toThrow('Async error');
+
+        const traces = getTraces();
+        expect(traces.length).toBe(1);
+
+        const loggedSpan = traces[0].data.spans[0];
+        expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.ERROR);
+        expect(loggedSpan.status?.description).toBe('Async error');
+      });
+    });
+
+    describe('options-based usage pattern', () => {
+      it('should execute with pre-configured options', () => {
+        const result = withSpan(
+          {
+            name: 'add-function',
+            span_type: SpanType.LLM,
+            inputs: { a: 10, b: 20 },
+            attributes: { model: 'test-model' }
+          },
+          () => { return 10 + 20; }
+        );
+
+        expect(result).toBe(30);
+
+        const traces = getTraces();
+        expect(traces.length).toBe(1);
+
+        const loggedSpan = traces[0].data.spans[0];
+        expect(loggedSpan.name).toBe('add-function');
+        expect(loggedSpan.spanType).toBe(SpanType.LLM);
+        expect(loggedSpan.inputs).toEqual({ a: 10, b: 20 });
+        expect(loggedSpan.outputs).toEqual(30);
+        expect(loggedSpan.attributes['model']).toBe('test-model');
+      });
+
+      it('should execute async with pre-configured options', async () => {
+        const result = await withSpan(
+          {
+            name: 'async-operation',
+            inputs: { data: 'test' },
+            attributes: { version: '1.0' }
+          },
+          async () => {
+            await new Promise(resolve => setTimeout(resolve, 10));
+            return 'processed-test';
+          }
+        );
+
+        expect(result).toBe('processed-test');
+
+        const traces = getTraces();
+        expect(traces.length).toBe(1);
+
+        const loggedSpan = traces[0].data.spans[0];
+        expect(loggedSpan.name).toBe('async-operation');
+        expect(loggedSpan.inputs).toEqual({ data: 'test' });
+        expect(loggedSpan.outputs).toBe('processed-test');
+        expect(loggedSpan.attributes['version']).toBe('1.0');
+      });
+
+      it('should handle nested spans with automatic parent-child relationship', () => {
+        const result = withSpan(
+          {
+            name: 'parent',
+            inputs: { operation: 'parent operation' }
+          },
+          (parentSpan) => {
+            // Nested withSpan call - should automatically be a child of the parent
+            const childResult = withSpan(
+              {
+                name: 'child',
+                inputs: { nested: true }
+              },
+              (childSpan) => {
+                childSpan.setAttributes({ nested: true });
+                return 'child result';
+              }
+            );
+
+            parentSpan.setOutputs({ childResult });
+            return childResult;
+          }
+        );
+
+        expect(result).toBe('child result');
+
+        const traces = getTraces();
+        expect(traces.length).toBe(1);
+        expect(traces[0].data.spans.length).toBe(2);
+
+        const parentSpan = traces[0].data.spans.find(s => s.name === 'parent');
+        expect(parentSpan?.inputs).toEqual({ operation: 'parent operation' });
+        expect(parentSpan?.outputs).toEqual({ childResult: 'child result' });
+
+        const childSpan = traces[0].data.spans.find(s => s.name === 'child');
+        expect(childSpan?.parentId).toBe(parentSpan?.spanId);
+        expect(childSpan?.inputs).toEqual({ nested: true });
+        expect(childSpan?.outputs).toEqual('child result');
+        expect(childSpan?.attributes['nested']).toBe(true);
+      });
+    });
+
+    describe('edge cases', () => {
+      it('should handle null return values', () => {
+        const result = withSpan((span) => {
+          span.setInputs({ test: true });
+          return null;
+        });
+
+        expect(result).toBeNull();
+
+        const traces = getTraces();
+        expect(traces.length).toBe(1);
+
+        const loggedSpan = traces[0].data.spans[0];
+        expect(loggedSpan.outputs).toBe(null); // Should auto-set null
+      });
+
+      it('should handle complex return objects', () => {
+        const complexObject = {
+          data: [1, 2, 3],
+          metadata: { type: 'array', length: 3 }
+        };
+
+        const result = withSpan((span) => {
+          span.setInputs({ operation: 'create complex object' });
+          return complexObject;
+        });
+
+        expect(result).toEqual(complexObject);
+
+        const traces = getTraces();
+        expect(traces.length).toBe(1);
+
+        const loggedSpan = traces[0].data.spans[0];
+        expect(loggedSpan.outputs).toEqual(complexObject);
+      });
     });
   });
 

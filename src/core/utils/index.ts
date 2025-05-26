@@ -1,5 +1,7 @@
 import { HrTime } from '@opentelemetry/api';
+import { Span as OTelSpan } from '@opentelemetry/sdk-trace-node';
 import { LiveSpan } from '../entities/span';
+import { SpanAttributeKey } from '../constants';
 
 /**
  * Deduplicate span names in the trace data by appending an index number to the span name.
@@ -59,3 +61,13 @@ export function convertHrTimeToNanoSeconds(hrTime: HrTime): number {
     return hrTime[0] * 1e9 + hrTime[1];
 }
 
+
+/**
+ * Extract MLflow trace ID from span attributes of an OTel span.
+ *
+ * @param otelSpan The OTel span
+ * @returns The MLflow trace ID
+ */
+export function getMlflowTraceIdFromOtelSpan(otelSpan: OTelSpan): string {
+    return JSON.parse(otelSpan.attributes[SpanAttributeKey.TRACE_ID] as string);
+}
