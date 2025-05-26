@@ -6,6 +6,7 @@ import { createTraceLocationFromExperimentId } from '../../src/core/entities/tra
 import { TraceState } from '../../src/core/entities/trace_state';
 import { SpanStatusCode } from '../../src/core/entities/span_status';
 import { SpanAttributeKey, SpanType } from '../../src/core/constants';
+import { createTestSpan } from '../helpers/span-helpers';
 
 /**
  * Helper function to create a test TraceInfo object
@@ -21,45 +22,6 @@ function createTestTraceInfo(traceId: string): TraceInfo {
     traceMetadata: {},
     tags: {},
   });
-}
-
-export class MockOtelSpan {
-  name: string;
-  attributes: Record<string, any>;
-  spanId: string;
-
-  constructor(spanId: string) {
-    this.name = 'test';
-    this.spanId = spanId;
-    this.attributes = {};
-  }
-
-  getAttribute(key: string) {
-    return this.attributes[key];
-  }
-
-  setAttribute(key: string, value: any) {
-    this.attributes[key] = value;
-  }
-
-  spanContext() {
-    return {
-      spanId: this.spanId,
-    };
-  }
-}
-
-/**
- * Helper function to create a test LiveSpan
- */
-function createTestSpan(
-  traceId: string = 'tr-12345',
-  spanId: string = '123',
-): LiveSpan {
-  // Create a mock OpenTelemetry span
-  const otelSpan = new MockOtelSpan(spanId);
-  const span = new LiveSpan(otelSpan as any, traceId, SpanType.UNKNOWN);
-  return span;
 }
 
 describe('InMemoryTraceManager', () => {
@@ -84,11 +46,11 @@ describe('InMemoryTraceManager', () => {
 
       // Add a new trace info
       const traceId = 'tr-1';
-      const otelTraceId = 12345;
+      const otelTraceId = '12345';
       traceManager.registerTrace(otelTraceId, createTestTraceInfo(traceId));
 
       // Add a span for a new trace
-      const span11 = createTestSpan(traceId, "span11");
+      const span11 = createTestSpan('test', traceId, 'span11');
       traceManager.registerSpan(span11);
 
       expect(traceManager.getTrace(traceId)).toBeTruthy();
@@ -97,8 +59,8 @@ describe('InMemoryTraceManager', () => {
       expect(trace1?.spanDict.size).toBe(1);
 
       // Add more spans to the same trace
-      const span111 = createTestSpan(traceId, "span111");
-      const span112 = createTestSpan(traceId, "span112");
+      const span111 = createTestSpan('test', traceId, 'span111');
+      const span112 = createTestSpan('test', traceId, 'span112');
       traceManager.registerSpan(span111);
       traceManager.registerSpan(span112);
       expect(trace1?.spanDict.size).toBe(3);

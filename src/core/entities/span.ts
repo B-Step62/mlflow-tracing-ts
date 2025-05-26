@@ -4,7 +4,7 @@ import { SpanAttributeKey, SpanType, NO_OP_SPAN_TRACE_ID } from '../constants';
 import { SpanEvent } from './span_event';
 import { SpanStatus, SpanStatusCode } from './span_status';
 import { SpanContext } from '@opentelemetry/api';
-
+import { convertHrTimeToNanoSeconds, convertNanoSecondsToHrTime } from '../utils';
 /**
  * MLflow Span interface
  */
@@ -26,6 +26,7 @@ export interface ISpan {
 
   get spanId(): string | null;
   get name(): string | null;
+  get spanType(): SpanType;
   get startTimeNs(): number | null;
   get endTimeNs(): number | null;
   get parentId(): string | null;
@@ -58,10 +59,6 @@ export class Span implements ISpan {
    * @param span OpenTelemetry span
    */
   constructor(span: OTelSpan, is_mutable: boolean = false) {
-    if (!span || !(span instanceof OTelSpan)) {
-      throw new Error('span must be an instance of OTelSpan');
-    }
-
     this._span = span;
 
     if (is_mutable) {
@@ -79,6 +76,10 @@ export class Span implements ISpan {
     return this._span.spanContext().spanId;
   }
 
+  get spanType(): SpanType {
+    return this.getAttribute(SpanAttributeKey.SPAN_TYPE);
+  }
+
   /**
    * Get the parent span ID
    */
@@ -94,13 +95,11 @@ export class Span implements ISpan {
   }
 
   get startTimeNs(): number {
-    const [seconds, nanoseconds] = this._span.startTime;
-    return seconds * 1_000_000_000 + nanoseconds;
+    return convertHrTimeToNanoSeconds(this._span.startTime);
   }
 
   get endTimeNs(): number | null {
-    const [seconds, nanoseconds] = this._span.endTime;
-    return seconds * 1_000_000_000 + nanoseconds;
+    return convertHrTimeToNanoSeconds(this._span.endTime);
   }
 
   get status(): SpanStatus {
@@ -204,7 +203,7 @@ export class LiveSpan extends Span {
    * @param status Status code or SpanStatus object
    * @param description Optional description for the status
    */
-  setStatus(status: SpanStatus | SpanStatusCode, description?: string): void {
+  setStatus(status: SpanStatus | SpanStatusCode | string, description?: string): void {
     if (status instanceof SpanStatus) {
       this._span.setStatus(status.toOtelStatus());
     } else if (typeof status === 'string') {
@@ -217,47 +216,66 @@ export class LiveSpan extends Span {
 
   /**
    * End the span
+   *
    * @param outputs Optional outputs to set before ending
+   * @param attributes Optional attributes to set before ending
    * @param status Optional status code
    * @param endTimeNs Optional end time in nanoseconds
    */
-  end(outputs?: any, status?: SpanStatus | SpanStatusCode, endTimeNs?: number): void {
-    if (outputs !== undefined) {
-      this.setOutputs(outputs);
+  end(
+    options?: {
+      outputs?: any,
+      attributes?: Record<string, any>,
+      status?: SpanStatus | SpanStatusCode,
+      endTimeNs?: number
+    }
+  ): void {
+    if (options?.outputs !== undefined) {
+      this.setOutputs(options.outputs);
     }
 
-    if (status !== undefined) {
-      this.setStatus(status);
+    if (options?.attributes !== undefined) {
+      this.setAttributes(options.attributes);
     }
 
-    if (endTimeNs !== undefined) {
-      this._span.end(endTimeNs);
-    } else {
-      this._span.end();
+    if (options?.status !== undefined) {
+      this.setStatus(options.status);
     }
+
+    // NB: In OpenTelemetry, status code remains UNSET if not explicitly set
+    // by the user. However, there is not way to set the status when using
+    // `trace` function wrapper. Therefore, we just automatically set the status
+    // to OK if it is not ERROR.
+    if (this.status.statusCode !== SpanStatusCode.ERROR) {
+      this.setStatus(SpanStatusCode.OK);
+    }
+
+    const endTime = (options?.endTimeNs) ? convertNanoSecondsToHrTime(options.endTimeNs) : undefined;
+    this._span.end(endTime);
   }
 }
 
 /**
  * A no-operation span implementation that doesn't record anything
  */
-export class NoOpSpan implements ISpan {
+export class NoOpSpan implements LiveSpan {
   readonly _span: any; // Use any for NoOp span to avoid type conflicts
   readonly _attributesRegistry: _SpanAttributesRegistry;
 
-  constructor(span: NonRecordingSpan) {
+  constructor(span?: NonRecordingSpan) {
     // Create a minimal no-op span object
-    this._span = span;
+    this._span = span || new NonRecordingSpan();
     this._attributesRegistry = new _SpanAttributesRegistry(this._span);
   }
 
   get traceId(): string { return NO_OP_SPAN_TRACE_ID; }
-  get spanId(): string | null { return null; }
+  get spanId(): string { return ''; }
   get parentId(): string | null { return null; }
-  get name(): string | null { return null; }
-  get startTimeNs(): number | null { return null; }
+  get name(): string { return ''; }
+  get spanType(): SpanType { return SpanType.UNKNOWN; }
+  get startTimeNs(): number { return 0; }
   get endTimeNs(): number | null { return null; }
-  get status(): SpanStatus | null { return null; }
+  get status(): SpanStatus { return new SpanStatus(SpanStatusCode.UNSET); }
   get inputs(): any { return null; }
   get outputs(): any { return null; }
   get attributes(): Record<string, any> { return {}; }
@@ -269,9 +287,10 @@ export class NoOpSpan implements ISpan {
   setOutputs(_outputs: any): void {}
   setAttribute(_key: string, _value: any): void {}
   setAttributes(_attributes: Record<string, any>): void {}
+  setStatus(_status: SpanStatus | SpanStatusCode | string, _description?: string): void {}
   addEvent(_event: SpanEvent): void {}
   recordException(_error: Error): void {}
-  end(_outputs?: any, _status?: SpanStatus | SpanStatusCode, _endTimeNs?: number): void {}
+  end(_outputs?: any, _attributes?: Record<string, any>, _status?: SpanStatus | SpanStatusCode, _endTimeNs?: number): void {}
 
   get events(): SpanEvent[] {
     return [];

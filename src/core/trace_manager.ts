@@ -50,7 +50,7 @@ export class InMemoryTraceManager {
   // TODO: Add TTL to the trace buffer similarly to Python SDK
   private _traces: Map<string, _Trace>;
   // Store mapping between OpenTelemetry trace ID and MLflow trace ID
-  private _otelIdToMlflowTraceId: Map<number, string>;
+  private _otelIdToMlflowTraceId: Map<string, string>;
 
 
   /**
@@ -65,7 +65,7 @@ export class InMemoryTraceManager {
 
   private constructor() {
     this._traces = new Map<string, _Trace>();
-    this._otelIdToMlflowTraceId = new Map<number, string>();
+    this._otelIdToMlflowTraceId = new Map<string, string>();
   }
 
   /**
@@ -73,7 +73,7 @@ export class InMemoryTraceManager {
    * @param otelTraceId The OpenTelemetry trace ID for the new trace
    * @param traceInfo The trace info object to be stored
    */
-  registerTrace(otelTraceId: number, traceInfo: TraceInfo): void {
+  registerTrace(otelTraceId: string, traceInfo: TraceInfo): void {
     this._traces.set(traceInfo.traceId, new _Trace(traceInfo));
     this._otelIdToMlflowTraceId.set(otelTraceId, traceInfo.traceId);
   }
@@ -105,7 +105,7 @@ export class InMemoryTraceManager {
    * Get the MLflow trace ID for the given OpenTelemetry trace ID.
    * @param otelTraceId The OpenTelemetry trace ID
    */
-  getMlflowTraceIdFromOtelId(otelTraceId: number): string | null {
+  getMlflowTraceIdFromOtelId(otelTraceId: string): string | null {
     return this._otelIdToMlflowTraceId.get(otelTraceId) || null;
   }
 
@@ -114,7 +114,7 @@ export class InMemoryTraceManager {
    * a ready-to-publish Trace object.
    * @param otelTraceId The OpenTelemetry trace ID
    */
-  popTrace(otelTraceId: number): Trace | null {
+  popTrace(otelTraceId: string): Trace | null {
     const mlflowTraceId = this._otelIdToMlflowTraceId.get(otelTraceId);
     if (!mlflowTraceId) {
       console.debug(`Tried to pop trace ${otelTraceId} but no trace found.`);

@@ -1,3 +1,4 @@
+import { SpanAttributeKey } from '../constants';
 import { ISpan } from './span';
 
 /**

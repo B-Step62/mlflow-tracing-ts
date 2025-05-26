@@ -43,6 +43,11 @@ export const TraceMetadataKey = {
 export const TRACE_SCHEMA_VERSION = '3';
 
 /**
+ * The prefix for MLflow trace IDs
+ */
+export const TRACE_ID_PREFIX = 'tr-';
+
+/**
  * Trace ID for no-op spans
  */
 export const NO_OP_SPAN_TRACE_ID = 'no-op-span-trace-id';
