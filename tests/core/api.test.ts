@@ -103,7 +103,44 @@ describe('API', () => {
         const loggedSpan = trace.data.spans[0];
         expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.ERROR);
         expect(loggedSpan.status?.description).toBe('test-error');
-      });
+    });
+
+    it('should create nested spans', () => {
+      const parentSpan = startSpan({name: 'parent-span'});
+      const childSpan1 = startSpan({name: 'child-span-1', parent: parentSpan});
+      childSpan1.end();
+
+      const childSpan2 = startSpan({name: 'child-span-2', parent: parentSpan});
+
+      const childSpan3 = startSpan({name: 'child-span-3', parent: childSpan2});
+      childSpan3.end();
+
+      childSpan2.end();
+
+      // This should not be a child of parentSpan
+      const independentSpan = startSpan({name: 'independent-span'});
+      independentSpan.end();
+
+      parentSpan.end();
+
+      const traces = getTraces();
+      expect(traces.length).toBe(2);
+
+
+      const trace1 = traces[0];
+      expect(trace1.data.spans.length).toBe(1);
+      expect(trace1.data.spans[0].name).toBe('independent-span');
+
+      const trace2 = traces[1];
+      expect(trace2.data.spans.length).toBe(4);
+      expect(trace2.data.spans[0].name).toBe('parent-span');
+      expect(trace2.data.spans[1].name).toBe('child-span-1');
+      expect(trace2.data.spans[1].parentId).toBe(trace2.data.spans[0].spanId);
+      expect(trace2.data.spans[2].name).toBe('child-span-2');
+      expect(trace2.data.spans[2].parentId).toBe(trace2.data.spans[0].spanId);
+      expect(trace2.data.spans[3].name).toBe('child-span-3');
+      expect(trace2.data.spans[3].parentId).toBe(trace2.data.spans[2].spanId);
+    });
   });
 
   afterEach(() => {

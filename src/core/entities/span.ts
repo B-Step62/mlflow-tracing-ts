@@ -84,10 +84,7 @@ export class Span implements ISpan {
    * Get the parent span ID
    */
   get parentId(): string | null {
-    if ('parentSpanContext' in this._span) {
-      return (this._span.parentSpanContext as SpanContext).spanId;
-    }
-    return null;
+    return this._span.parentSpanId || null;
   }
 
   get name(): string {

@@ -1,4 +1,4 @@
-import { HrTime } from '@opentelemetry/api';
+import { trace, context } from '@opentelemetry/api';
 import { Span as OTelSpan } from '@opentelemetry/sdk-trace-base';
 import { SpanAttributeKey, SpanType } from "./constants";
 import { createMlflowSpan, ISpan, LiveSpan, NoOpSpan } from "./entities/span";
@@ -10,6 +10,7 @@ import { convertNanoSecondsToHrTime } from './utils';
 
 /**
  * Start a new span with the given name and span type.
+ * This function does NOT attach the created span to the current context.
  *
  * The span must be ended by calling `end` method on the returned Span object.
  *
@@ -17,6 +18,7 @@ import { convertNanoSecondsToHrTime } from './utils';
  * @param span_type The type of the span.
  * @param inputs The inputs of the span.
  * @param attributes The attributes of the span.
+ * @param parent The parent span object.
  */
 export function startSpan(
     options: {
@@ -24,18 +26,29 @@ export function startSpan(
         span_type?: SpanType,
         inputs?: any,
         attributes?: Record<string, any>,
-        startTimeNs?: number
+        startTimeNs?: number,
+        parent?: LiveSpan,
     }
 ): LiveSpan {
     try {
         const tracer = getTracer('default');
+        console.log(options.parent?.name)
 
-        const otel_span = tracer.startSpan(options.name, {
-            startTime: (options.startTimeNs) ? convertNanoSecondsToHrTime(options.startTimeNs) : undefined
-        }) as OTelSpan;
+        // If parent is provided, use it as the parent span
+        let parentContext = context.active();
+        if (options.parent) {
+            parentContext = trace.setSpan(parentContext, options.parent._span);
+        }
 
+        // Convert startTimeNs to OTel format
+        const startTime = (options.startTimeNs) ? convertNanoSecondsToHrTime(options.startTimeNs) : undefined;
+
+        const otel_span = tracer.startSpan(options.name, {startTime: startTime}, parentContext) as OTelSpan;
+
+        // Trace ID is set to the span attribute in SpanProcessor.onStart()
         const trace_id = JSON.parse(otel_span.attributes[SpanAttributeKey.TRACE_ID] as string);
 
+        // Create the MLflow span from the OTel span
         const mlflow_span = createMlflowSpan(otel_span, trace_id, options.span_type) as LiveSpan;
 
         if (options.inputs) {
