@@ -150,9 +150,9 @@ describe('Span', () => {
 
         expect(span).toBeInstanceOf(NoOpSpan);
         expect(span.traceId).toBe('no-op-span-trace-id');
-        expect(span.spanId).toBeNull();
-        expect(span.name).toBeNull();
-        expect(span.startTimeNs).toBeNull();
+        expect(span.spanId).toBe('');
+        expect(span.name).toBe('');
+        expect(span.startTimeNs).toBe(0);
         expect(span.endTimeNs).toBeNull();
         expect(span.parentId).toBeNull();
         expect(span.inputs).toBeNull();

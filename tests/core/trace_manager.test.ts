@@ -4,6 +4,7 @@ import { TraceInfo } from '../../src/core/entities/trace_info';
 import { createTraceLocationFromExperimentId } from '../../src/core/entities/trace_location';
 import { TraceState } from '../../src/core/entities/trace_state';
 import { createTestSpan } from '../helpers/span-helpers';
+import { Span } from '../../src/core/entities/span';
 
 /**
  * Helper function to create a test TraceInfo object

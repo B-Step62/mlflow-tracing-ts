@@ -6,7 +6,6 @@ import { getTracer } from "./provider";
 import { InMemoryTraceManager } from "./trace_manager";
 import { convertNanoSecondsToHrTime, getMlflowTraceIdFromOtelSpan } from './utils';
 
-
 /**
  * Options for starting a span
  *
@@ -35,7 +34,6 @@ export interface SpanOptions {
 export function startSpan(options: SpanOptions): LiveSpan {
     try {
         const tracer = getTracer('default');
-        console.log(options.parent?.name)
 
         // If parent is provided, use it as the parent span
         let parentContext = context.active();
@@ -119,8 +117,6 @@ return tracer.startActiveSpan(
     try {
         // Execute the callback with the span
         const result = actualCallback(mlflowSpan);
-
-        console.log("a", otelSpan, (otelSpan as OTelSpan).parentSpanContext);
 
         // Handle both sync and async results
         if (result instanceof Promise) {
