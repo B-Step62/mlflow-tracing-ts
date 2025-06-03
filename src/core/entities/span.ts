@@ -252,6 +252,7 @@ export class LiveSpan extends Span {
 /**
  * A no-operation span implementation that doesn't record anything
  */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 export class NoOpSpan implements LiveSpan {
   readonly _span: any; // Use any for NoOp span to avoid type conflicts
   readonly _attributesRegistry: _SpanAttributesRegistry;

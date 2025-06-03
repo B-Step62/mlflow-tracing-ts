@@ -1,8 +1,6 @@
 import {
   TraceLocation,
   TraceLocationType,
-  MlflowExperimentLocation,
-  InferenceTableLocation,
   createTraceLocationFromExperimentId
 } from '../../../src/core/entities/trace_location';
 

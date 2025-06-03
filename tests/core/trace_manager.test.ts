@@ -1,11 +1,8 @@
 import { InMemoryTraceManager } from '../../src/core/trace_manager';
-import { LiveSpan, Span } from '../../src/core/entities/span';
 import { Trace } from '../../src/core/entities/trace';
 import { TraceInfo } from '../../src/core/entities/trace_info';
 import { createTraceLocationFromExperimentId } from '../../src/core/entities/trace_location';
 import { TraceState } from '../../src/core/entities/trace_state';
-import { SpanStatusCode } from '../../src/core/entities/span_status';
-import { SpanAttributeKey, SpanType } from '../../src/core/constants';
 import { createTestSpan } from '../helpers/span-helpers';
 
 /**

@@ -1,6 +1,5 @@
 import { trace } from '@opentelemetry/api';
-const { BasicTracerProvider } = require('@opentelemetry/sdk-trace-base');
-
+import { BasicTracerProvider } from '@opentelemetry/sdk-trace-base';
 import { createMlflowSpan, Span, NoOpSpan, LiveSpan } from '../../../src/core/entities/span';
 import { SpanEvent } from '../../../src/core/entities/span_event';
 import { SpanStatus, SpanStatusCode } from '../../../src/core/entities/span_status';

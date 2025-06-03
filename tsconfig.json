@@ -11,6 +11,6 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
-  "include": ["src", "tests/core/entities/span_event.test.ts", "tests/core/entities/span_status.test.ts", "tests/core/entities/trace_info.test.ts", "tests/core/entities/trace_location.test.ts", "tests/core/entities/trace_state.test.ts"],
-  "exclude": ["node_modules", "**/__tests__/*"]
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", "dist"]
 }

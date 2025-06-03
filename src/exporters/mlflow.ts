@@ -44,7 +44,8 @@ export class MlflowSpanProcessor implements SpanProcessor {
    * returns true.
    * @param span the Span that just started.
    */
-  onStart(span: OTelSpan, parentContext: Context): void {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onStart(span: OTelSpan, _parentContext: Context): void {
     const otelTraceId = span.spanContext().traceId;
 
     let traceId: string;
@@ -99,7 +100,8 @@ export class MlflowSpanProcessor implements SpanProcessor {
     this.updateTraceInfo(trace.info, span);
     deduplicateSpanNamesInPlace(Array.from(trace.spanDict.values()));
 
-    this._exporter.export([span], (result) => {});
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    this._exporter.export([span], (_result) => {});
   }
 
   /**
@@ -135,7 +137,8 @@ export class MlflowSpanProcessor implements SpanProcessor {
 export class MlflowSpanExporter implements SpanExporter {
   export(
     spans: OTelReadableSpan[],
-    resultCallback: (result: ExportResult) => void
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _resultCallback: (result: ExportResult) => void
   ): void {
     for (const span of spans) {
       // Only export root spans
