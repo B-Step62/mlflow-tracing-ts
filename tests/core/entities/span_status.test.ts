@@ -44,4 +44,61 @@ describe('SpanStatus', () => {
       });
     });
   });
+
+  describe('toJson round-trip serialization', () => {
+    it('should serialize and recreate status with all properties', () => {
+      const originalStatus = new SpanStatus(SpanStatusCode.ERROR, 'Something went wrong');
+      
+      const json = originalStatus.toJson();
+      
+      // Verify JSON structure
+      expect(json).toEqual({
+        status_code: SpanStatusCode.ERROR,
+        description: 'Something went wrong'
+      });
+
+      // Create new status from JSON data
+      const recreatedStatus = new SpanStatus(json.status_code, json.description);
+
+      // Verify round-trip preservation
+      expect(recreatedStatus.statusCode).toBe(originalStatus.statusCode);
+      expect(recreatedStatus.description).toBe(originalStatus.description);
+      expect(recreatedStatus.toJson()).toEqual(originalStatus.toJson());
+    });
+
+    it('should handle status with different status codes', () => {
+      const testCases = [
+        { code: SpanStatusCode.OK, description: 'All good' },
+        { code: SpanStatusCode.ERROR, description: 'Failed operation' },
+        { code: SpanStatusCode.UNSET, description: '' }
+      ];
+
+      testCases.forEach(({ code, description }) => {
+        const originalStatus = new SpanStatus(code, description);
+        const json = originalStatus.toJson();
+        const recreatedStatus = new SpanStatus(json.status_code, json.description);
+
+        expect(recreatedStatus.statusCode).toBe(originalStatus.statusCode);
+        expect(recreatedStatus.description).toBe(originalStatus.description);
+        expect(recreatedStatus.toJson()).toEqual(originalStatus.toJson());
+      });
+    });
+
+    it('should handle status with minimal properties', () => {
+      const originalStatus = new SpanStatus(SpanStatusCode.OK);
+      
+      const json = originalStatus.toJson();
+      
+      expect(json).toEqual({
+        status_code: SpanStatusCode.OK,
+        description: ''
+      });
+
+      const recreatedStatus = new SpanStatus(json.status_code, json.description);
+      
+      expect(recreatedStatus.statusCode).toBe(originalStatus.statusCode);
+      expect(recreatedStatus.description).toBe(originalStatus.description);
+      expect(recreatedStatus.toJson()).toEqual(originalStatus.toJson());
+    });
+  });
 });

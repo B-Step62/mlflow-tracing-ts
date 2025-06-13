@@ -44,6 +44,12 @@ export interface ISpan {
    * Get events from the span
    */
   get events(): SpanEvent[];
+
+  /**
+   * Convert this span to JSON format
+   * @returns JSON object representation of the span
+   */
+  toJson(): any;
 }
 
 /**
@@ -127,6 +133,27 @@ export class Span implements ISpan {
         timestamp: seconds * 1_000_000_000 + nanoseconds,
       });
     });
+  }
+
+  /**
+   * Convert this span to JSON format
+   * @returns JSON object representation of the span
+   */
+  toJson(): any {
+    return {
+      trace_id: this.traceId,
+      span_id: this.spanId,
+      parent_id: this.parentId,
+      name: this.name,
+      span_type: this.spanType,
+      start_time_ns: this.startTimeNs,
+      end_time_ns: this.endTimeNs,
+      status: this.status?.toJson() || null,
+      inputs: this.inputs,
+      outputs: this.outputs,
+      attributes: this.attributes,
+      events: this.events.map(event => event.toJson())
+    };
   }
 }
 
@@ -289,6 +316,10 @@ export class NoOpSpan implements LiveSpan {
 
   get events(): SpanEvent[] {
     return [];
+  }
+
+  toJson(): any {
+    return {};
   }
 }
 

@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# When Referrencing External Code
+
+When the developer asks about existing code or pass some Github link for you to read reference implementation, you must directly read the code by accessing raw Github link. You MUST not search it on web and see the source page in MLflow documentation, which is based on the released version and not necessarilly up-to-date.
+
+Similarly, when you are searching for a particular code or implementation, you must always use Github as single source of truth.

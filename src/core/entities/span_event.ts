@@ -145,6 +145,18 @@ export class SpanEvent {
   }
 
   /**
+   * Convert this SpanEvent to JSON format
+   * @returns JSON object representation of the span event
+   */
+  toJson(): any {
+    return {
+      name: this.name,
+      timestamp: this.timestamp,
+      attributes: this.attributes
+    };
+  }
+
+  /**
    * Gets the current time in microseconds since epoch.
    *
    * @returns Current timestamp in microseconds

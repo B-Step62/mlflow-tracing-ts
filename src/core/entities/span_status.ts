@@ -104,4 +104,15 @@ export class SpanStatus {
 
     return new SpanStatus(statusCode, otelStatus.message || '');
   }
+
+  /**
+   * Convert this SpanStatus to JSON format
+   * @returns JSON object representation of the span status
+   */
+  toJson(): any {
+    return {
+      status_code: this.statusCode,
+      description: this.description
+    };
+  }
 }

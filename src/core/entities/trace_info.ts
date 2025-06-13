@@ -91,4 +91,61 @@ export class TraceInfo {
     // TODO: Assessments are not yet supported in the TypeScript SDK.
     this.assessments = [];
   }
+
+  /**
+   * Convert this TraceInfo instance to JSON format
+   * @returns JSON object representation of the TraceInfo
+   */
+  toJson(): any {
+    return {
+      trace_id: this.traceId,
+      client_request_id: this.clientRequestId,
+      trace_location: {
+        type: this.traceLocation.type,
+        mlflow_experiment: this.traceLocation.mlflowExperiment ? {
+          experiment_id: this.traceLocation.mlflowExperiment.experimentId
+        } : undefined,
+        inference_table: this.traceLocation.inferenceTable ? {
+          full_table_name: this.traceLocation.inferenceTable.fullTableName
+        } : undefined
+      },
+      request_preview: this.requestPreview,
+      response_preview: this.responsePreview,
+      request_time: new Date(this.requestTime).toISOString(),
+      execution_duration: this.executionDuration ? `${this.executionDuration / 1000}s` : undefined,
+      state: this.state,
+      trace_metadata: this.traceMetadata,
+      tags: this.tags,
+      assessments: this.assessments
+    };
+  }
+
+  /**
+   * Create a TraceInfo instance from JSON data
+   * @param json JSON object containing trace info data
+   * @returns TraceInfo instance
+   */
+  static fromJson(json: any): TraceInfo {
+    return new TraceInfo({
+      traceId: json.trace_id,
+      clientRequestId: json.client_request_id,
+      traceLocation: {
+        type: json.trace_location?.type,
+        mlflowExperiment: json.trace_location?.mlflow_experiment ? {
+          experimentId: json.trace_location.mlflow_experiment.experiment_id
+        } : undefined,
+        inferenceTable: json.trace_location?.inference_table ? {
+          fullTableName: json.trace_location.inference_table.full_table_name
+        } : undefined
+      },
+      requestPreview: json.request_preview,
+      responsePreview: json.response_preview,
+      requestTime: json.request_time ? new Date(json.request_time).getTime() : Date.now(),
+      executionDuration: json.execution_duration ? parseFloat(json.execution_duration.replace('s', '')) * 1000 : undefined,
+      state: json.state,
+      traceMetadata: json.trace_metadata || {},
+      tags: json.tags || {},
+      assessments: json.assessments || []
+    });
+  }
 }
