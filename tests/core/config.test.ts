@@ -1,7 +1,6 @@
 import { configure, getConfig, readDatabricksConfig } from '../../src/core/config';
 import fs from 'fs';
 import os from 'os';
-import path from 'path';
 
 // Mock fs module
 jest.mock('fs');
