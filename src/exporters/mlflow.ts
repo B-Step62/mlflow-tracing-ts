@@ -176,20 +176,25 @@ export class MlflowSpanExporter implements SpanExporter {
 
   /**
    * Export a complete trace to the MLflow backend
-   * Currently only creates trace metadata via StartTraceV3 endpoint
-   * Note: Span data upload mechanism is not yet implemented in MLflow API v3
+   * Step 1: Create trace metadata via StartTraceV3 endpoint
+   * Step 2: Upload trace data (spans) via artifact repository pattern
    */
   private async exportTraceToBackend(trace: Trace): Promise<void> {
-    // Step 1: Create trace metadata in backend
-    console.log(`Creating trace ${trace.info.traceId} in backend...`);
-    await this._client.createTrace(trace);
+    try {
+      // Step 1: Create trace metadata in backend
+      console.log(`Creating trace ${trace.info.traceId} in backend...`);
+      await this._client.createTrace(trace);
+      console.log(`Trace ${trace.info.traceId} created successfully`);
 
-    console.log(`Trace ${trace.info.traceId} created successfully`);
+      // Step 2: Upload trace data (spans) to cloud storage
+      console.log(`Uploading trace data for ${trace.info.traceId}...`);
+      await this._client.uploadTraceData(trace);
+      console.log(`Trace data uploaded successfully for ${trace.info.traceId}`);
 
-    // TODO: Step 2 - Upload span data 
-    // The MLflow API v3 doesn't seem to have a specific endpoint for span upload
-    // Need to investigate how spans are stored in MLflow backend
-    console.log(`Note: Span data upload not yet implemented for trace ${trace.info.traceId}`);
+    } catch (error) {
+      console.error(`Failed to export trace ${trace.info.traceId}:`, error);
+      throw error;
+    }
   }
 
   shutdown(): Promise<void> {

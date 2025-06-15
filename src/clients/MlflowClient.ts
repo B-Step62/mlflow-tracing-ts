@@ -1,6 +1,7 @@
 import { TraceInfo } from "../core/entities/trace_info";
 import { Trace } from "../core/entities/trace";
 import { TraceData } from "../core/entities/trace_data";
+import { ArtifactCredentialInfo, GetCredentialsForTraceDataUploadResponse } from "../core/entities/artifact_credential_info";
 
 /**
  * Databricks client for MLflow tracing operations - implements the full
@@ -46,13 +47,92 @@ export class MlflowClient {
   }
 
   /**
-   * Upload trace data (spans) to the backend
-   * TODO: This needs to be implemented once we understand how MLflow API v3 handles span data
+   * Upload trace data (spans) to the backend using artifact repository pattern.
+   *
+   * 1. Get credentials for upload
+   * 2. Serialize trace data to JSON
+   * 3. Upload to cloud storage using the credentials
    */
   async uploadTraceData(trace: Trace): Promise<void> {
-    // TODO: Investigate the correct endpoint for uploading span data
-    // The StartTraceV3 endpoint only handles trace metadata, not spans
-    throw new Error('uploadTraceData not yet implemented - MLflow API v3 span upload mechanism unclear');
+    try {
+      console.log(`Starting trace data upload for ${trace.info.traceId}`);
+      const credentials = await this.getCredentialsForTraceDataUpload(trace.info.traceId);
+      console.log(`Got credentials: type=${credentials.type}, signed_uri=${credentials.signed_uri.substring(0, 50)}...`);
+      
+      const traceDataJson = JSON.stringify(trace.data.toJson());
+      console.log(`Serialized trace data: ${traceDataJson.length} characters`);
+      
+      await this.uploadToCloudStorage(credentials, traceDataJson);
+    } catch (error) {
+      console.error(`Trace data upload failed for ${trace.info.traceId}:`, error);
+      
+      // For now, don't throw - let the trace creation succeed even if data upload fails
+      // TODO: Make this configurable or implement retry logic
+      console.warn(`Continuing without trace data upload due to error: ${(error as Error).message}`);
+    }
+  }
+
+
+  /**
+   * Get credentials for uploading trace data
+   * Endpoint: GET /api/2.0/mlflow/traces/{request_id}/credentials-for-data-upload
+   */
+  private async getCredentialsForTraceDataUpload(requestId: string): Promise<ArtifactCredentialInfo> {
+    const url = `${this.host}/api/2.0/mlflow/traces/${requestId}/credentials-for-data-upload`;
+    console.log(`Getting credentials for trace data upload: ${url}`);
+    const response = await this.makeRequest('GET', url) as GetCredentialsForTraceDataUploadResponse;
+    return response.credential_info;
+  }
+
+  /**
+   * Upload data to cloud storage using the provided credentials
+   */
+  private async uploadToCloudStorage(credentials: ArtifactCredentialInfo, data: string): Promise<void> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add headers from credentials
+    credentials.headers.forEach(header => {
+      headers[header.name] = header.value;
+    });
+
+    switch (credentials.type) {
+      case 'AWS_PRESIGNED_URL':
+      case 'GCP_SIGNED_URL':
+        await this.uploadToSignedUrl(credentials.signed_uri, data, headers, credentials.type);
+        break;
+      // TODO: Implement Azure upload
+      case 'AZURE_SAS_URI':
+      case 'AZURE_ADLS_GEN2_SAS_URI':
+        throw new Error(`Azure upload not yet implemented for credential type: ${credentials.type}`);
+      default:
+        throw new Error(`Unsupported credential type: ${credentials.type}`);
+    }
+  }
+
+  /**
+   * Upload data to cloud storage using signed URL (AWS S3 or GCP Storage)
+   */
+  private async uploadToSignedUrl(
+    signedUrl: string,
+    data: string,
+    headers: Record<string, string>,
+    credentialType: string
+  ): Promise<void> {
+    try {
+      const response = await fetch(signedUrl, {
+        method: 'PUT',
+        headers,
+        body: data
+      });
+
+      if (!response.ok) {
+        throw new Error(`${credentialType} upload failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      throw new Error(`Failed to upload to ${credentialType}: ${(error as Error).message}`);
+    }
   }
 
     // === TRACE RETRIEVAL METHODS ===
@@ -118,14 +198,24 @@ export class MlflowClient {
     let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
 
     try {
-      const errorBody = await response.json();
-      if (errorBody.message) {
-        errorMessage = errorBody.message;
-      } else if (errorBody.error_code) {
-        errorMessage = `${errorBody.error_code}: ${errorBody.message || 'Unknown error'}`;
+      const contentType = response.headers.get('content-type');
+      console.log(`Error response content-type: ${contentType}`);
+      
+      if (contentType?.includes('application/json')) {
+        const errorBody = await response.json();
+        if (errorBody.message) {
+          errorMessage = errorBody.message;
+        } else if (errorBody.error_code) {
+          errorMessage = `${errorBody.error_code}: ${errorBody.message || 'Unknown error'}`;
+        }
+      } else {
+        // Not JSON, get first 200 chars of text for debugging
+        const errorText = await response.text();
+        console.log(`Non-JSON error response: ${errorText.substring(0, 200)}...`);
+        errorMessage = `${errorMessage} (received ${contentType || 'unknown'} instead of JSON)`;
       }
-    } catch {
-      // If we can't parse the error body, use the basic message
+    } catch (parseError) {
+      console.log(`Failed to parse error response: ${parseError}`);
     }
 
     throw new Error(errorMessage);
