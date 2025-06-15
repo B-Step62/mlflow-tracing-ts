@@ -26,7 +26,7 @@ This is a TypeScript SDK for MLflow Tracing that provides LLM observability. It'
 ```
 User Code → MLflow APIs → OpenTelemetry → Span Processor → Exporter → Backend
     ↓            ↓              ↓              ↓           ↓          ↓
-withSpan()   LiveSpan    OTel Span    MlflowProcessor  DatabricksClient  REST API
+withSpan()   LiveSpan    OTel Span    MlflowProcessor  MlflowClient  REST API
 ```
 
 ### Initialization Flow
@@ -143,14 +143,14 @@ All entities support JSON serialization for API communication:
 **MlflowSpanExporter**:
 - Exports complete traces (not individual spans)
 - Currently stores in memory for testing
-- Designed to integrate with DatabricksClient for real export
+- Designed to integrate with MlflowClient for real export
 
 **Export Triggers**:
 - Only root span completion triggers export
 - Child spans contribute to trace but don't trigger export
 - Ensures complete traces are exported atomically
 
-### Databricks Client (`src/clients/DatabricksClient.ts`)
+### MLflow Client (`src/clients/MlflowClient.ts`)
 
 **Complete REST API Implementation**:
 - Authentication via Bearer token from `.databrickscfg`

@@ -6,14 +6,16 @@
  * Enum for span types that can be used with MLflow Tracing
  */
 export enum SpanType {
-  UNKNOWN = 'UNKNOWN',
   LLM = 'LLM',
-  CHAT_MODEL = 'CHAT_MODEL',
-  EMBEDDING = 'EMBEDDING',
+  CHAIN = 'CHAIN',
   AGENT = 'AGENT',
-  RETRIEVER = 'RETRIEVER',
   TOOL = 'TOOL',
-  CUSTOM = 'CUSTOM',
+  CHAT_MODEL = 'CHAT_MODEL',
+  RETRIEVER = 'RETRIEVER',
+  PARSER = 'PARSER',
+  EMBEDDING = 'EMBEDDING',
+  RERANKER = 'RERANKER',
+  UNKNOWN = 'UNKNOWN'
 }
 
 /**

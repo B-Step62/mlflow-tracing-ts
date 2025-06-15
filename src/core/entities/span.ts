@@ -136,23 +136,25 @@ export class Span implements ISpan {
   }
 
   /**
-   * Convert this span to JSON format
+   * Convert this span to JSON format (OpenTelemetry format)
    * @returns JSON object representation of the span
    */
   toJson(): any {
     return {
-      trace_id: this.traceId,
       span_id: this.spanId,
-      parent_id: this.parentId,
+      parent_span_id: this.parentId || undefined,
       name: this.name,
-      span_type: this.spanType,
-      start_time_ns: this.startTimeNs,
-      end_time_ns: this.endTimeNs,
-      status: this.status?.toJson() || null,
-      inputs: this.inputs,
-      outputs: this.outputs,
-      attributes: this.attributes,
-      events: this.events.map(event => event.toJson())
+      start_time_unix_nano: this.startTimeNs,
+      end_time_unix_nano: this.endTimeNs,
+      status: {
+        code: this.status?.statusCode || 'UNSET'
+      },
+      attributes: this.attributes || {},
+      events: this.events.map(event => ({
+        name: event.name,
+        time_unix_nano: event.timestamp,
+        attributes: event.attributes || {}
+      }))
     };
   }
 }
@@ -398,14 +400,26 @@ class _CachedSpanAttributesRegistry extends _SpanAttributesRegistry {
   private readonly _cache = new Map<string, any>();
 
   /**
-   * Get a single attribute value with caching
+   * Get a single attribute value with LRU caching (maxsize=128)
    */
   get(key: string): any {
     if (this._cache.has(key)) {
-      return this._cache.get(key);
+      // Move to end (most recently used)
+      const value = this._cache.get(key);
+      this._cache.delete(key);
+      this._cache.set(key, value);
+      return value;
     }
 
     const value = super.get(key);
+
+    // Implement LRU eviction
+    if (this._cache.size >= 128) {
+      // Remove least recently used (first entry)
+      const firstKey = this._cache.keys().next().value;
+      this._cache.delete(firstKey!);
+    }
+
     this._cache.set(key, value);
     return value;
   }
@@ -413,7 +427,7 @@ class _CachedSpanAttributesRegistry extends _SpanAttributesRegistry {
   /**
    * Set operation is not allowed for cached registry (immutable spans)
    */
-  set(key: string, value: any): void {
+  set(_key: string, _value: any): void {
     throw new Error('The attributes of the immutable span must not be updated.');
   }
 }

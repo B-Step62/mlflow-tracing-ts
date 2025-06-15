@@ -10,6 +10,8 @@ import { createTraceLocationFromExperimentId } from '../core/entities/trace_loca
 import { fromOtelStatus, TraceState } from '../core/entities/trace_state';
 import { SpanAttributeKey, TRACE_ID_PREFIX } from '../core/constants';
 import { convertHrTimeToNanoSeconds, deduplicateSpanNamesInPlace } from '../core/utils';
+import { MlflowClient } from '../clients';
+import { getConfig } from '../core/config';
 
 
 
@@ -50,13 +52,15 @@ export class MlflowSpanProcessor implements SpanProcessor {
 
     let traceId: string;
 
+    const experimentId = getConfig().experiment_id;
+
     if (!span.parentSpanContext) {
       // This is a root span
       traceId = generateTraceId(span);
       const trace_info = new TraceInfo({
         traceId: traceId,
         // TODO: Set correct experiment ID once we implement an API for setting trace destination
-        traceLocation: createTraceLocationFromExperimentId(null),
+        traceLocation: createTraceLocationFromExperimentId(experimentId),
         requestTime: convertHrTimeToNanoSeconds(span.startTime) / 1e6,
         executionDuration: 0,
         state: TraceState.IN_PROGRESS,
@@ -135,6 +139,13 @@ export class MlflowSpanProcessor implements SpanProcessor {
 
 
 export class MlflowSpanExporter implements SpanExporter {
+  private _client: MlflowClient;
+
+  constructor(client: MlflowClient) {
+    this._client = client;
+  }
+
+
   export(
     spans: OTelReadableSpan[],
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -152,11 +163,33 @@ export class MlflowSpanExporter implements SpanExporter {
         continue;
       }
 
+      // TODO: Implement this so that users can get the last active trace ID
       // setLastActiveTraceId(trace.info.traceId);
 
-      // TODO: Implement the actual export logic to MLflow backend
-      _traces.push(trace);
+      // Export trace to backend
+      this.exportTraceToBackend(trace).catch((error) => {
+        console.error(`Failed to export trace ${trace.info.traceId}:`, error);
+      });
+
     }
+  }
+
+  /**
+   * Export a complete trace to the MLflow backend
+   * Currently only creates trace metadata via StartTraceV3 endpoint
+   * Note: Span data upload mechanism is not yet implemented in MLflow API v3
+   */
+  private async exportTraceToBackend(trace: Trace): Promise<void> {
+    // Step 1: Create trace metadata in backend
+    console.log(`Creating trace ${trace.info.traceId} in backend...`);
+    await this._client.createTrace(trace);
+
+    console.log(`Trace ${trace.info.traceId} created successfully`);
+
+    // TODO: Step 2 - Upload span data 
+    // The MLflow API v3 doesn't seem to have a specific endpoint for span upload
+    // Need to investigate how spans are stored in MLflow backend
+    console.log(`Note: Span data upload not yet implemented for trace ${trace.info.traceId}`);
   }
 
   shutdown(): Promise<void> {
