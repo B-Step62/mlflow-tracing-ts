@@ -182,15 +182,9 @@ export class MlflowSpanExporter implements SpanExporter {
   private async exportTraceToBackend(trace: Trace): Promise<void> {
     try {
       // Step 1: Create trace metadata in backend
-      console.log(`Creating trace ${trace.info.traceId} in backend...`);
-      await this._client.createTrace(trace);
-      console.log(`Trace ${trace.info.traceId} created successfully`);
-
-      // Step 2: Upload trace data (spans) to cloud storage
-      console.log(`Uploading trace data for ${trace.info.traceId}...`);
-      await this._client.uploadTraceData(trace);
-      console.log(`Trace data uploaded successfully for ${trace.info.traceId}`);
-
+      const traceInfo = await this._client.createTrace(trace);
+      // Step 2: Upload trace data (spans) to artifact storage
+      await this._client.uploadTraceData(traceInfo, trace.data);
     } catch (error) {
       console.error(`Failed to export trace ${trace.info.traceId}:`, error);
       throw error;

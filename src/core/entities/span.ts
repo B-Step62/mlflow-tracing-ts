@@ -1,9 +1,11 @@
 import { NonRecordingSpan } from '@opentelemetry/api/build/src/trace/NonRecordingSpan';
 import { Span as OTelSpan } from '@opentelemetry/sdk-trace-node';
+import { SpanStatusCode as OTelSpanStatusCode } from '@opentelemetry/api';
 import { SpanAttributeKey, SpanType, NO_OP_SPAN_TRACE_ID } from '../constants';
 import { SpanEvent } from './span_event';
 import { SpanStatus, SpanStatusCode } from './span_status';
-import { convertHrTimeToNanoSeconds, convertNanoSecondsToHrTime } from '../utils';
+import { convertHrTimeToNanoSeconds, convertNanoSecondsToHrTime, encodeSpanIdToBase64, decodeSpanIdFromBase64 } from '../utils';
+import { HrTime } from '@opentelemetry/api';
 /**
  * MLflow Span interface
  */
@@ -23,13 +25,13 @@ export interface ISpan {
    */
   readonly attributes: Record<string, any>;
 
-  get spanId(): string | null;
-  get name(): string | null;
+  get spanId(): string;
+  get name(): string;
   get spanType(): SpanType;
-  get startTimeNs(): number | null;
-  get endTimeNs(): number | null;
+  get startTime(): HrTime;
+  get endTime(): HrTime | null;
   get parentId(): string | null;
-  get status(): SpanStatus | null;
+  get status(): SpanStatus;
   get inputs(): any;
   get outputs(): any;
 
@@ -50,6 +52,21 @@ export interface ISpan {
    * @returns JSON object representation of the span
    */
   toJson(): any;
+
+  // Optional methods for mutable spans (LiveSpan)
+  setInputs?(inputs: any): void;
+  setOutputs?(outputs: any): void;
+  setAttribute?(key: string, value: any): void;
+  setAttributes?(attributes: Record<string, any>): void;
+  setStatus?(status: SpanStatus | SpanStatusCode | string, description?: string): void;
+  addEvent?(event: SpanEvent): void;
+  recordException?(error: Error): void;
+  end?(options?: {
+    outputs?: any,
+    attributes?: Record<string, any>,
+    status?: SpanStatus | SpanStatusCode,
+    endTimeNs?: number
+  }): void;
 }
 
 /**
@@ -96,12 +113,12 @@ export class Span implements ISpan {
     return this._span.name;
   }
 
-  get startTimeNs(): number {
-    return convertHrTimeToNanoSeconds(this._span.startTime);
+  get startTime(): HrTime {
+    return this._span.startTime;
   }
 
-  get endTimeNs(): number | null {
-    return convertHrTimeToNanoSeconds(this._span.endTime);
+  get endTime(): HrTime | null {
+    return this._span.endTime;
   }
 
   get status(): SpanStatus {
@@ -141,11 +158,11 @@ export class Span implements ISpan {
    */
   toJson(): any {
     return {
-      span_id: this.spanId,
-      parent_span_id: this.parentId || undefined,
+      span_id: encodeSpanIdToBase64(this.spanId),
+      parent_span_id: this.parentId ? encodeSpanIdToBase64(this.parentId) : undefined,
       name: this.name,
-      start_time_unix_nano: this.startTimeNs,
-      end_time_unix_nano: this.endTimeNs,
+      start_time_unix_nano: convertHrTimeToNanoSeconds(this.startTime),
+      end_time_unix_nano: this.endTime ? convertHrTimeToNanoSeconds(this.endTime) : null,
       status: {
         code: this.status?.statusCode || 'UNSET'
       },
@@ -157,8 +174,79 @@ export class Span implements ISpan {
       }))
     };
   }
+
+  /**
+   * Create a Span from JSON data (following Python implementation)
+   * Converts the JSON data back into OpenTelemetry-compatible span
+   */
+  static fromJson(json: any): ISpan {
+    // Convert the JSON data back to an OpenTelemetry-like span structure
+    // This is simplified compared to Python but follows the same pattern
+    
+    const otelSpanData = {
+      name: json.name,
+      startTime: convertNanoSecondsToHrTime(json.start_time_unix_nano),
+      endTime: convertNanoSecondsToHrTime(json.end_time_unix_nano),
+      status: {
+        code: convertStatusCodeToOTel(json.status?.code) || OTelSpanStatusCode.UNSET
+      },
+      // For fromJson, attributes are already in their final form (not JSON serialized)
+      // so we store them directly
+      attributes: json.attributes || {},
+      events: (json.events || []).map((event: any) => ({
+        name: event.name,
+        time: convertNanoSecondsToHrTime(event.time_unix_nano),
+        attributes: event.attributes || {}
+      })),
+      ended: true,
+      // Add spanContext() method that returns proper SpanContext
+      spanContext: () => ({
+        traceId: json.trace_id,
+        spanId: decodeSpanIdFromBase64(json.span_id),
+        traceFlags: 1, // Sampled
+        isRemote: false
+      }),
+      // Add parentSpanContext for parent span ID
+      parentSpanContext: json.parent_span_id ? {
+        traceId: json.trace_id,
+        spanId: decodeSpanIdFromBase64(json.parent_span_id),
+        traceFlags: 1,
+        isRemote: false
+      } : undefined
+    };
+
+    // Create a span that behaves like our Span class but from downloaded data
+    return new Span(otelSpanData as any, false); // false = immutable
+  }
 }
 
+/**
+ * Convert MLflow status codes to OpenTelemetry status codes
+ * @param statusCode Status code from MLflow JSON format
+ * @returns OpenTelemetry compatible status code
+ */
+function convertStatusCodeToOTel(statusCode?: string): OTelSpanStatusCode {
+  if (!statusCode) return OTelSpanStatusCode.UNSET;
+  
+  // Handle MLflow format -> OTel format conversion
+  switch (statusCode) {
+    case 'STATUS_CODE_OK':
+      return OTelSpanStatusCode.OK;
+    case 'STATUS_CODE_ERROR':
+      return OTelSpanStatusCode.ERROR;
+    case 'STATUS_CODE_UNSET':
+      return OTelSpanStatusCode.UNSET;
+    // Also handle OTel format directly
+    case 'OK':
+      return OTelSpanStatusCode.OK;
+    case 'ERROR':
+      return OTelSpanStatusCode.ERROR;
+    case 'UNSET':
+      return OTelSpanStatusCode.UNSET;
+    default:
+      return OTelSpanStatusCode.UNSET;
+  }
+}
 
 export class LiveSpan extends Span {
   constructor(span: OTelSpan, traceId: string, span_type: SpanType) {
@@ -297,8 +385,8 @@ export class NoOpSpan implements LiveSpan {
   get parentId(): string | null { return null; }
   get name(): string { return ''; }
   get spanType(): SpanType { return SpanType.UNKNOWN; }
-  get startTimeNs(): number { return 0; }
-  get endTimeNs(): number | null { return null; }
+  get startTime(): HrTime { return [0, 0]; }
+  get endTime(): HrTime | null { return null; }
   get status(): SpanStatus { return new SpanStatus(SpanStatusCode.UNSET); }
   get inputs(): any { return null; }
   get outputs(): any { return null; }
@@ -364,10 +452,9 @@ class _SpanAttributesRegistry {
       try {
         return JSON.parse(serializedValue);
       } catch (e) {
-        console.warn(
-          `Failed to get value for key ${key}, make sure you set the attribute ` +
-          `on mlflow Span class instead of directly to the OpenTelemetry span. ${e}`
-        );
+        // If JSON.parse fails, this might be a raw string value or 
+        // the span was created from JSON (attributes already parsed)
+        // In that case, return the value as-is
         return serializedValue;
       }
     }

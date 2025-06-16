@@ -5,6 +5,7 @@ import { SpanStatus, SpanStatusCode } from '../../src/core/entities/span_status'
 import { TraceState } from '../../src/core/entities/trace_state';
 import { InMemoryTraceManager } from '../../src/core/trace_manager';
 import { getTraces, resetTraces } from '../../src/exporters/mlflow';
+import { convertHrTimeToNanoSeconds } from '../../src/core/utils';
 
 
 
@@ -28,8 +29,10 @@ describe('API', () => {
       const trace = traces[0];
       expect(trace.info.traceId).toBe(span.traceId);
       expect(trace.info.state).toBe(TraceState.OK);
-      expect(trace.info.requestTime).toBeCloseTo(span.startTimeNs / 1000000);
-      expect(trace.info.executionDuration).toBeCloseTo((span.endTimeNs! - span.startTimeNs) / 1000000);
+      const startTimeNs = convertHrTimeToNanoSeconds(span.startTime);
+      const endTimeNs = convertHrTimeToNanoSeconds(span.endTime!);
+      expect(trace.info.requestTime).toBeCloseTo(startTimeNs / 1000000);
+      expect(trace.info.executionDuration).toBeCloseTo((endTimeNs - startTimeNs) / 1000000);
       expect(trace.data.spans.length).toBe(1);
 
       const loggedSpan = trace.data.spans[0];
@@ -39,8 +42,8 @@ describe('API', () => {
       expect(loggedSpan.inputs).toEqual({ prompt: 'Hello, world!' });
       expect(loggedSpan.outputs).toEqual({ response: 'Hello, world!' });
       expect(loggedSpan.attributes['model']).toBe('gpt-4');
-      expect(loggedSpan.startTimeNs).toBe(span.startTimeNs);
-      expect(loggedSpan.endTimeNs).toBe(span.endTimeNs);
+      expect(convertHrTimeToNanoSeconds(loggedSpan.startTime)).toBe(convertHrTimeToNanoSeconds(span.startTime));
+      expect(convertHrTimeToNanoSeconds(loggedSpan.endTime!)).toBe(convertHrTimeToNanoSeconds(span.endTime!));
       expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.OK);
     });
 
@@ -51,13 +54,13 @@ describe('API', () => {
             span_type: SpanType.LLM,
             inputs: { prompt: 'Hello, world!' },
             attributes: { model: 'gpt-4' },
-            startTimeNs: 1e9  // 1 second
+            startTimeNs: 1e9  // 1 second (still input parameter)
         });
         span.end({
             outputs: { response: 'Hello, world!' },
             attributes: { model: 'gpt-4' },
             status: SpanStatusCode.ERROR,
-            endTimeNs: 3e9  // 3 seconds
+            endTimeNs: 3e9  // 3 seconds (still input parameter)
         });
 
         // Validate traces pushed to the in-memory buffer
@@ -77,8 +80,8 @@ describe('API', () => {
         expect(loggedSpan.inputs).toEqual({ prompt: 'Hello, world!' });
         expect(loggedSpan.outputs).toEqual({ response: 'Hello, world!' });
         expect(loggedSpan.attributes['model']).toBe('gpt-4');
-        expect(loggedSpan.startTimeNs).toBe(1e9);
-        expect(loggedSpan.endTimeNs).toBe(3e9);
+        expect(convertHrTimeToNanoSeconds(loggedSpan.startTime)).toBe(1e9);
+        expect(convertHrTimeToNanoSeconds(loggedSpan.endTime!)).toBe(3e9);
         expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.ERROR);
     });
 
@@ -96,8 +99,10 @@ describe('API', () => {
         const trace = traces[0];
         expect(trace.info.traceId).toBe(span.traceId);
         expect(trace.info.state).toBe(TraceState.ERROR);
-        expect(trace.info.requestTime).toBeCloseTo(span.startTimeNs / 1000000);
-        expect(trace.info.executionDuration).toBeCloseTo((span.endTimeNs! - span.startTimeNs) / 1000000);
+        const spanStartNs = convertHrTimeToNanoSeconds(span.startTime);
+        const spanEndNs = convertHrTimeToNanoSeconds(span.endTime!);
+        expect(trace.info.requestTime).toBeCloseTo(spanStartNs / 1000000);
+        expect(trace.info.executionDuration).toBeCloseTo((spanEndNs - spanStartNs) / 1000000);
         expect(trace.data.spans.length).toBe(1);
 
         const loggedSpan = trace.data.spans[0];

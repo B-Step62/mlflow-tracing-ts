@@ -4,6 +4,7 @@ import { createMlflowSpan, Span, NoOpSpan, LiveSpan } from '../../../src/core/en
 import { SpanEvent } from '../../../src/core/entities/span_event';
 import { SpanStatus, SpanStatusCode } from '../../../src/core/entities/span_status';
 import { SpanAttributeKey, SpanType } from '../../../src/core/constants';
+import { convertHrTimeToNanoSeconds } from '../../../src/core/utils';
 
 // Set up a proper tracer provider
 const provider = new BasicTracerProvider();
@@ -26,8 +27,8 @@ describe('Span', () => {
           expect(mlflowSpan.traceId).toBe(traceId);
           expect(mlflowSpan.name).toBe('parent');
           /* OpenTelemetry's end time default value is 0 when unset */
-          expect(mlflowSpan.startTimeNs).toBeGreaterThan(0);
-          expect(mlflowSpan.endTimeNs).toBe(0);
+          expect(mlflowSpan.startTime[0]).toBeGreaterThan(0); // Check seconds part of HrTime
+          expect(mlflowSpan.endTime![1]).toBe(0); // Check nanoseconds part of HrTime
           expect(mlflowSpan.parentId).toBeNull();
         } finally {
           span.end();
@@ -128,8 +129,8 @@ describe('Span', () => {
         expect(mlflowSpan).toBeInstanceOf(Span);
         expect(mlflowSpan.traceId).toBe(traceId);
         expect(mlflowSpan.name).toBe('parent');
-        expect(mlflowSpan.startTimeNs).toBeGreaterThan(0);
-        expect(mlflowSpan.endTimeNs).toBeGreaterThan(0);
+        expect(convertHrTimeToNanoSeconds(mlflowSpan.startTime)).toBeGreaterThan(0);
+        expect(convertHrTimeToNanoSeconds(mlflowSpan.endTime!)).toBeGreaterThan(0);
         expect(mlflowSpan.parentId).toBeNull();
         expect(mlflowSpan.inputs).toEqual({ input: 1 });
         expect(mlflowSpan.outputs).toBe(2);
@@ -152,8 +153,8 @@ describe('Span', () => {
         expect(span.traceId).toBe('no-op-span-trace-id');
         expect(span.spanId).toBe('');
         expect(span.name).toBe('');
-        expect(span.startTimeNs).toBe(0);
-        expect(span.endTimeNs).toBeNull();
+        expect(span.startTime).toEqual([0, 0]); // HrTime format [seconds, nanoseconds]
+        expect(span.endTime).toBeNull();
         expect(span.parentId).toBeNull();
         expect(span.inputs).toBeNull();
         expect(span.outputs).toBeNull();
@@ -165,6 +166,155 @@ describe('Span', () => {
 
         expect(span).toBeInstanceOf(NoOpSpan);
       });
+    });
+  });
+
+  describe('JSON Serialization', () => {
+    it('should produce correct JSON format for toJson()', () => {
+      const traceId = 'tr-12345';
+      const span = tracer.startSpan('test-span');
+
+      try {
+        const mlflowSpan = createMlflowSpan(span, traceId, SpanType.LLM) as LiveSpan;
+
+        // Set inputs, outputs, and attributes to match expected format
+        mlflowSpan.setInputs({ x: 1 });
+        mlflowSpan.setOutputs(2);
+        mlflowSpan.setAttribute('mlflow.spanFunctionName', 'f');
+        mlflowSpan.setStatus(SpanStatusCode.OK);
+
+        // Add an event
+        const event = new SpanEvent({
+          name: 'test_event',
+          timestamp: 1500000000000,
+          attributes: { eventAttr: 'value' }
+        });
+        mlflowSpan.addEvent(event);
+
+      } finally {
+        span.end();
+      }
+
+      // Get the completed span
+      const completedSpan = createMlflowSpan(span, traceId);
+      const json = completedSpan.toJson();
+
+      // Validate JSON structure matches expected format
+      expect(json).toHaveProperty('span_id');
+      expect(json).toHaveProperty('name', 'test-span');
+      expect(json).toHaveProperty('start_time_unix_nano');
+      expect(json).toHaveProperty('end_time_unix_nano');
+      expect(json).toHaveProperty('attributes');
+      expect(json).toHaveProperty('status');
+      expect(json).toHaveProperty('events');
+
+      // Validate that attributes exist and have correct values
+      expect(json.attributes['mlflow.spanInputs']).toEqual({x: 1});
+      expect(json.attributes['mlflow.spanOutputs']).toBe(2);
+      expect(json.attributes['mlflow.spanType']).toBe('LLM');
+      expect(json.attributes['mlflow.traceRequestId']).toBe(traceId);
+
+      // Validate status format
+      expect(json.status).toHaveProperty('code');
+      expect(json.status.code).toBe('OK');
+
+      // Validate timestamps are numbers
+      expect(typeof json.start_time_unix_nano).toBe('number');
+      expect(typeof json.end_time_unix_nano).toBe('number');
+
+      // Validate events structure
+      expect(Array.isArray(json.events)).toBe(true);
+      if (json.events.length > 0) {
+        const event = json.events[0];
+        expect(event).toHaveProperty('name');
+        expect(event).toHaveProperty('time_unix_nano');
+        expect(event).toHaveProperty('attributes');
+      }
+    });
+
+    it('should match expected JSON format from real MLflow data', () => {
+      // Create a span that matches the real MLflow data structure
+      const expectedSpanData = {
+        trace_id: "rZo9DIws+6d2tejICXD4gw==",
+        span_id: "DOD2qjZ6ZrU=",
+        trace_state: "",
+        parent_span_id: "",
+        name: "python",
+        start_time_unix_nano: 1749996461282772491,
+        end_time_unix_nano: 1749996461365717111,
+        attributes: {
+          "mlflow.spanOutputs": "2",
+          "mlflow.spanType": "\"LLM\"",
+          "mlflow.spanInputs": "{\"x\": 1}",
+          "mlflow.traceRequestId": "\"tr-ad9a3d0c8c2cfba776b5e8c80970f883\"",
+          "mlflow.spanFunctionName": "\"f\""
+        },
+        status: {
+          message: "",
+          code: "STATUS_CODE_OK"
+        },
+        events: []
+      };
+
+      // Test fromJson can handle this format
+      const span = Span.fromJson(expectedSpanData);
+
+      // Validate key properties
+      expect(span.traceId).toBe('tr-ad9a3d0c8c2cfba776b5e8c80970f883');
+      expect(span.spanId).toBe('0ce0f6aa367a66b5');
+      expect(span.name).toBe('python');
+      expect(span.spanType).toBe(SpanType.LLM);
+      // Check that HrTime conversion works correctly
+      expect(convertHrTimeToNanoSeconds(span.startTime)).toBe(1749996461282772491);
+      expect(convertHrTimeToNanoSeconds(span.endTime!)).toBe(1749996461365717111);
+      expect(span.parentId).toBeNull();
+      expect(span.status.statusCode).toBe(SpanStatusCode.OK);
+      expect(span.status.description).toBe('');
+      expect(span.inputs).toStrictEqual({x: 1});
+      expect(span.outputs).toBe(2);
+      expect(span.events).toEqual([]);
+    });
+
+    it('should handle round-trip JSON serialization correctly', () => {
+      const traceId = 'tr-test-round-trip';
+      const span = tracer.startSpan('round-trip-test');
+
+      try {
+        const mlflowSpan = createMlflowSpan(span, traceId, SpanType.CHAIN) as LiveSpan;
+
+        // Set comprehensive test data
+        mlflowSpan.setInputs({ input: 'test', number: 42 });
+        mlflowSpan.setOutputs({ result: 'success', count: 100 });
+        mlflowSpan.setAttribute('custom.attribute', 'custom_value');
+        mlflowSpan.setAttribute('numeric.attribute', 123);
+        mlflowSpan.setStatus(SpanStatusCode.OK);
+
+      } finally {
+        span.end();
+      }
+
+      // Round-trip test: span -> JSON -> span -> JSON
+      const originalSpan = createMlflowSpan(span, traceId);
+      const originalJson = originalSpan.toJson();
+
+      // Create new span from JSON
+      const reconstructedSpan = Span.fromJson(originalJson);
+
+
+      // Key properties should match
+      expect(reconstructedSpan.name).toBe(originalSpan.name);
+      expect(convertHrTimeToNanoSeconds(reconstructedSpan.startTime)).toBe(convertHrTimeToNanoSeconds(originalSpan.startTime));
+      expect(convertHrTimeToNanoSeconds(reconstructedSpan.endTime!)).toBe(convertHrTimeToNanoSeconds(originalSpan.endTime!));
+      expect(reconstructedSpan.parentId).toBe(originalSpan.parentId);
+
+      // Attributes should be preserved
+      expect(reconstructedSpan.attributes).toEqual(originalSpan.attributes);
+
+      // Status should be preserved
+      expect(reconstructedSpan.status.statusCode).toBe(originalSpan.status.statusCode);
+
+      // Events should be preserved
+      expect(reconstructedSpan.events).toEqual(originalSpan.events);
     });
   });
 });

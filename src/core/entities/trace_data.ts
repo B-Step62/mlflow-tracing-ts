@@ -1,4 +1,4 @@
-import { ISpan } from './span';
+import { ISpan, Span } from './span';
 
 /**
  * Represents the spans and associated data for a trace
@@ -29,12 +29,19 @@ export class TraceData {
   }
 
   /**
-   * Create a TraceData instance from JSON data
+   * Create a TraceData instance from JSON data (following Python implementation)
    * @param json JSON object containing trace data
    * @returns TraceData instance
    */
   static fromJson(json: any): TraceData {
-    // TODO: Implement proper span deserialization when ISpan has fromJson method
-    return new TraceData(json.spans || []);
+    if (!json || typeof json !== 'object') {
+      throw new Error(`TraceData.fromJson() expects an object. Got: ${typeof json}`);
+    }
+
+    // Convert each span JSON to a Span object using Span.fromJson
+    // This follows the exact pattern from Python: [Span.from_dict(span) for span in d.get("spans", [])]
+    const spans: ISpan[] = (json.spans || []).map((spanData: any) => Span.fromJson(spanData));
+
+    return new TraceData(spans);
   }
 }

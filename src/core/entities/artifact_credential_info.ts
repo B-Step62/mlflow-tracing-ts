@@ -29,8 +29,8 @@ export interface ArtifactCredentialInfo {
   /** Signed URI credential for artifact access */
   signed_uri: string;
   
-  /** HTTP headers for upload/download */
-  headers: HttpHeader[];
+  /** HTTP headers for upload/download (optional, may not be present) */
+  headers?: HttpHeader[];
   
   /** Type of signed credential URI */
   type: ArtifactCredentialType;

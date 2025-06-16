@@ -33,7 +33,7 @@ export class MlflowClient {
    * Note: the backend API is named as "Start" due to unfortunate miscommunication.
    * The API is indeed called at the "end" of a trace, not the "start".
    */
-  async createTrace(trace: Trace): Promise<Trace> {
+  async createTrace(trace: Trace): Promise<TraceInfo> {
     const url = `${this.host}/api/3.0/mlflow/traces`;
 
     const payload = {
@@ -43,7 +43,7 @@ export class MlflowClient {
     };
 
     const response = await this.makeRequest('POST', url, payload);
-    return response as Trace;
+    return TraceInfo.fromJson(response.trace.trace_info);
   }
 
   /**
@@ -53,22 +53,14 @@ export class MlflowClient {
    * 2. Serialize trace data to JSON
    * 3. Upload to cloud storage using the credentials
    */
-  async uploadTraceData(trace: Trace): Promise<void> {
+  async uploadTraceData(traceInfo: TraceInfo, traceData: TraceData): Promise<void> {
     try {
-      console.log(`Starting trace data upload for ${trace.info.traceId}`);
-      const credentials = await this.getCredentialsForTraceDataUpload(trace.info.traceId);
-      console.log(`Got credentials: type=${credentials.type}, signed_uri=${credentials.signed_uri.substring(0, 50)}...`);
-      
-      const traceDataJson = JSON.stringify(trace.data.toJson());
-      console.log(`Serialized trace data: ${traceDataJson.length} characters`);
-      
+      const credentials = await this.getCredentialsForTraceDataUpload(traceInfo.traceId);
+      const traceDataJson = JSON.stringify(traceData.toJson());
       await this.uploadToCloudStorage(credentials, traceDataJson);
     } catch (error) {
-      console.error(`Trace data upload failed for ${trace.info.traceId}:`, error);
-      
-      // For now, don't throw - let the trace creation succeed even if data upload fails
-      // TODO: Make this configurable or implement retry logic
-      console.warn(`Continuing without trace data upload due to error: ${(error as Error).message}`);
+      console.error(`Trace data upload failed for ${traceInfo.traceId}:`, error);
+      throw error;
     }
   }
 
@@ -79,7 +71,6 @@ export class MlflowClient {
    */
   private async getCredentialsForTraceDataUpload(requestId: string): Promise<ArtifactCredentialInfo> {
     const url = `${this.host}/api/2.0/mlflow/traces/${requestId}/credentials-for-data-upload`;
-    console.log(`Getting credentials for trace data upload: ${url}`);
     const response = await this.makeRequest('GET', url) as GetCredentialsForTraceDataUploadResponse;
     return response.credential_info;
   }
@@ -92,10 +83,12 @@ export class MlflowClient {
       'Content-Type': 'application/json',
     };
 
-    // Add headers from credentials
-    credentials.headers.forEach(header => {
-      headers[header.name] = header.value;
-    });
+    // Add headers from credentials (if they exist)
+    if (credentials.headers && Array.isArray(credentials.headers)) {
+      credentials.headers.forEach(header => {
+        headers[header.name] = header.value;
+      });
+    }
 
     switch (credentials.type) {
       case 'AWS_PRESIGNED_URL':
@@ -139,6 +132,7 @@ export class MlflowClient {
 
   /**
    * Get a single trace by ID
+   * Fetches both trace info and trace data from backend
    * Corresponds to Python: client.get_trace()
    */
   async getTrace(traceId: string): Promise<Trace> {
@@ -147,17 +141,95 @@ export class MlflowClient {
     return new Trace(traceInfo, traceData);
   }
 
+  /**
+   * Get trace info using V3 API
+   * Endpoint: GET /api/3.0/mlflow/traces/{trace_id}
+   */
   async getTraceInfo(traceId: string): Promise<TraceInfo> {
     const url = `${this.host}/api/3.0/mlflow/traces/${traceId}`;
 
     const response = await this.makeRequest('GET', url);
-    return response as TraceInfo;
+
+    // The V3 API returns a Trace object with trace_info field
+    if (response.trace && response.trace.trace_info) {
+      return TraceInfo.fromJson(response.trace.trace_info);
+    }
+
+    throw new Error('Invalid response format: missing trace_info');
   }
 
+  /**
+   * Download trace data (spans) from cloud storage
+   * Uses artifact repository pattern with signed URLs
+   */
   async downloadTraceData(traceInfo: TraceInfo): Promise<TraceData> {
-    // TODO: Implement
-    const data = await this.makeRequest('GET', `${this.host}/api/3.0/mlflow/traces/${traceInfo.traceId}/data`);
-    return data as TraceData;
+    try {
+      const credentials = await this.getCredentialsForTraceDataDownload(traceInfo.traceId);
+      const traceDataJson = await this.downloadFromSignedUrl(credentials);
+      return TraceData.fromJson(traceDataJson);
+    } catch (error) {
+      console.warn(`Failed to download trace data for ${traceInfo.traceId}:`, error);
+
+      // Return empty trace data if download fails
+      // This allows getting trace info even if data is missing
+      return new TraceData([]);
+    }
+  }
+
+  /**
+   * Get credentials for downloading trace data
+   * Endpoint: GET /mlflow/traces/{request_id}/credentials-for-data-download
+   */
+  private async getCredentialsForTraceDataDownload(requestId: string): Promise<ArtifactCredentialInfo> {
+    const url = `${this.host}/api/2.0/mlflow/traces/${requestId}/credentials-for-data-download`;
+
+    const response = await this.makeRequest('GET', url);
+
+    if (response.credential_info) {
+      return response.credential_info;
+    } else {
+      throw new Error('Invalid response format: missing credential_info');
+    }
+  }
+
+  /**
+   * Download data from cloud storage using signed URL
+   */
+  private async downloadFromSignedUrl(credentials: ArtifactCredentialInfo): Promise<any> {
+    const headers: Record<string, string> = {};
+
+    // Add headers from credentials (if they exist)
+    if (credentials.headers && Array.isArray(credentials.headers)) {
+      credentials.headers.forEach(header => {
+        headers[header.name] = header.value;
+      });
+    }
+
+    try {
+      const response = await fetch(credentials.signed_uri, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(`Trace data not found (404)`);
+        }
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+
+      const textData = await response.text();
+      try {
+        return JSON.parse(textData);
+      } catch (parseError) {
+        throw new Error(`Trace data corrupted: invalid JSON - ${(parseError as Error).message}`);
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Failed to download trace data: ${error}`);
+    }
   }
 
   // === PRIVATE HELPER METHODS ===
@@ -168,11 +240,6 @@ export class MlflowClient {
     body?: any
   ): Promise<any> {
     try {
-      console.log(`Making request to: ${url}`);
-      console.log(`Method: ${method}`);
-      console.log(`Body: ${body ? JSON.stringify(body) : 'None'}`);
-      console.log(`Headers: ${JSON.stringify(this.getAuthHeaders())}`);
-
       const response = await fetch(url, {
         method,
         headers: this.getAuthHeaders(),
@@ -199,8 +266,7 @@ export class MlflowClient {
 
     try {
       const contentType = response.headers.get('content-type');
-      console.log(`Error response content-type: ${contentType}`);
-      
+
       if (contentType?.includes('application/json')) {
         const errorBody = await response.json();
         if (errorBody.message) {
@@ -211,11 +277,11 @@ export class MlflowClient {
       } else {
         // Not JSON, get first 200 chars of text for debugging
         const errorText = await response.text();
-        console.log(`Non-JSON error response: ${errorText.substring(0, 200)}...`);
+        console.error(`Non-JSON error response: ${errorText.substring(0, 200)}...`);
         errorMessage = `${errorMessage} (received ${contentType || 'unknown'} instead of JSON)`;
       }
     } catch (parseError) {
-      console.log(`Failed to parse error response: ${parseError}`);
+      console.error(`Failed to parse error response: ${parseError}`);
     }
 
     throw new Error(errorMessage);
