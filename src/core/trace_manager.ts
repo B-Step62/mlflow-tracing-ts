@@ -3,6 +3,7 @@ import type { TraceInfo } from './entities/trace_info';
 import { Trace } from './entities/trace';
 import { TraceData } from './entities/trace_data';
 import { SpanAttributeKey } from './constants';
+import NodeCache from 'node-cache';
 
 /**
  * Internal representation to keep the state of a trace.
@@ -43,14 +44,17 @@ class _Trace {
 
 /**
  * Manage spans and traces created by the tracing system in memory.
- * This class is implemented as a singleton.
+ * This class is implemented as a singleton with TTL-based cleanup using NodeCache.
+ * 
+ * Configuration via environment variables:
+ * - MLFLOW_TRACE_BUFFER_TTL_SECONDS: TTL for traces in seconds (default: 3600 = 1 hour)
+ * - MLFLOW_TRACE_BUFFER_MAX_SIZE: Maximum number of traces in memory (default: 1000)
  */
 export class InMemoryTraceManager {
   private static _instance: InMemoryTraceManager | null = null;
 
-  // In-memory cache to store trace_id -> _Trace mapping
-  // TODO: Add TTL to the trace buffer similarly to Python SDK
-  private _traces: Map<string, _Trace>;
+  // TTL-enabled cache to store trace_id -> _Trace mapping
+  private _traces: NodeCache;
   // Store mapping between OpenTelemetry trace ID and MLflow trace ID
   private _otelIdToMlflowTraceId: Map<string, string>;
 
@@ -65,8 +69,34 @@ export class InMemoryTraceManager {
   }
 
   private constructor() {
-    this._traces = new Map<string, _Trace>();
+    // Read configuration from environment variables (matching Python SDK)
+    const ttlSeconds = parseInt(process.env.MLFLOW_TRACE_BUFFER_TTL_SECONDS || '3600', 10);
+    const maxTraces = parseInt(process.env.MLFLOW_TRACE_BUFFER_MAX_SIZE || '1000', 10);
+    const checkPeriod = Math.max(60, Math.floor(ttlSeconds / 6)); // Check every ~10 minutes, min 1 minute
+
+    // Initialize traces cache with TTL
+    this._traces = new NodeCache({
+      stdTTL: ttlSeconds,
+      checkperiod: checkPeriod,
+      useClones: false, // Better performance, we control the objects
+      deleteOnExpire: true,
+      maxKeys: maxTraces
+    });
+
+    // Initialize OTel ID mapping as regular Map (cleaned up on popTrace)
     this._otelIdToMlflowTraceId = new Map<string, string>();
+
+    // Clean up OTel mapping when trace expires from cache
+    this._traces.on('expired', (key: string, value: _Trace) => {
+      console.debug(`Trace ${key} expired from cache after ${ttlSeconds}s`);
+      // Find and remove the corresponding OTel mapping
+      for (const [otelId, mlflowId] of this._otelIdToMlflowTraceId.entries()) {
+        if (mlflowId === key) {
+          this._otelIdToMlflowTraceId.delete(otelId);
+          break;
+        }
+      }
+    });
   }
 
   /**
@@ -84,7 +114,7 @@ export class InMemoryTraceManager {
    * @param span The span to be stored
    */
   registerSpan(span: LiveSpan): void {
-    const trace = this._traces.get(span.traceId);
+    const trace = this._traces.get(span.traceId) as _Trace | undefined;
     if (trace) {
       trace.spanDict.set(span.spanId, span);
     } else {
@@ -99,7 +129,7 @@ export class InMemoryTraceManager {
    * @param traceId The trace ID to look up
    */
   getTrace(traceId: string): _Trace | null {
-    return this._traces.get(traceId) || null;
+    return (this._traces.get(traceId) as _Trace) || null;
   }
 
   /**
@@ -116,7 +146,7 @@ export class InMemoryTraceManager {
    * @param spanId The span ID
    */
   getSpan(traceId: string, spanId: string): LiveSpan | null {
-    const trace = this._traces.get(traceId);
+    const trace = this._traces.get(traceId) as _Trace | undefined;
     if (trace) {
       return trace.spanDict.get(spanId) || null;
     }
@@ -136,9 +166,9 @@ export class InMemoryTraceManager {
     }
 
     this._otelIdToMlflowTraceId.delete(otelTraceId);
-    const trace = this._traces.get(mlflowTraceId);
+    const trace = this._traces.get(mlflowTraceId) as _Trace | undefined;
     if (trace) {
-      this._traces.delete(mlflowTraceId);
+      this._traces.del(mlflowTraceId); // Use NodeCache .del() method
       return trace.toMlflowTrace();
     }
     console.debug(`Tried to pop trace ${otelTraceId} but trace not found.`);
@@ -150,7 +180,7 @@ export class InMemoryTraceManager {
    */
   static reset(): void {
     if (InMemoryTraceManager._instance) {
-      InMemoryTraceManager._instance._traces.clear();
+      InMemoryTraceManager._instance._traces.flushAll(); // NodeCache method to clear all
       InMemoryTraceManager._instance._otelIdToMlflowTraceId.clear();
       InMemoryTraceManager._instance = null;
     }
