@@ -12,10 +12,24 @@ export class MlflowClient {
   private host: string;
   /** Personal access token */
   private token?: string;
+  /** HTTP request timeout in milliseconds */
+  private timeoutMs: number;
 
-  constructor(options: { host: string; token: string }) {
+  constructor(options: { host: string; token: string; timeoutMs?: number }) {
     this.host = options.host;
     this.token = options.token;
+    this.timeoutMs = options.timeoutMs ?? this.getDefaultTimeout();
+  }
+
+  private getDefaultTimeout(): number {
+    const envTimeout = process.env.MLFLOW_HTTP_REQUEST_TIMEOUT;
+    if (envTimeout) {
+      const timeout = parseInt(envTimeout, 10);
+      if (!isNaN(timeout) && timeout > 0) {
+        return timeout;
+      }
+    }
+    return 30000; // Default 30 seconds
   }
 
   private getAuthHeaders(): Record<string, string> {
@@ -239,12 +253,18 @@ export class MlflowClient {
     url: string,
     body?: any
   ): Promise<any> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
     try {
       const response = await fetch(url, {
         method,
         headers: this.getAuthHeaders(),
-        body: body ? JSON.stringify(body) : undefined
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         await this.handleErrorResponse(response);
@@ -257,7 +277,15 @@ export class MlflowClient {
 
       return await response.json();
     } catch (error) {
-      throw new Error(`Databricks API request failed: ${(error as Error).message}`);
+      clearTimeout(timeoutId);
+
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error(`Request timeout after ${this.timeoutMs}ms`);
+        }
+        throw new Error(`Databricks API request failed: ${error.message}`);
+      }
+      throw new Error(`Databricks API request failed: ${String(error)}`);
     }
   }
 

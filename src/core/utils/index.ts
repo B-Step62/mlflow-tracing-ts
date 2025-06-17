@@ -88,7 +88,7 @@ export function encodeSpanIdToBase64(spanId: string): string {
     // Parse hex string (remove any padding to 16 chars)
     const hexStr = spanId.padStart(16, '0');
     for (let i = 0; i < 8; i++) {
-        bytes[i] = parseInt(hexStr.substr(i * 2, 2), 16);
+        bytes[i] = parseInt(hexStr.substring(i * 2, i * 2 + 2), 16);
     }
 
     // Convert to base64
@@ -108,7 +108,7 @@ export function encodeTraceIdToBase64(traceId: string): string {
   // Parse hex string (remove any padding to 32 chars)
   const hexStr = traceId.padStart(32, '0');
   for (let i = 0; i < 16; i++) {
-    bytes[i] = parseInt(hexStr.substr(i * 2, 2), 16);
+    bytes[i] = parseInt(hexStr.substring(i * 2, i * 2 + 2), 16);
   }
 
   // Convert to base64

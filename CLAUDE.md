@@ -157,6 +157,7 @@ All entities support JSON serialization for API communication:
 - Full error handling with HTTP status parsing
 - Type-safe request/response interfaces
 - Support for all MLflow tracing operations
+- Configurable HTTP request timeouts (default 30s)
 
 **Client Operations**:
 - Trace lifecycle management
@@ -165,8 +166,15 @@ All entities support JSON serialization for API communication:
 - Tag management for trace metadata
 - Health checking for connectivity validation
 
+**Timeout Configuration**:
+- Default timeout: 30 seconds
+- Environment variable: `MLFLOW_HTTP_REQUEST_TIMEOUT` (milliseconds)
+- Constructor option: `timeoutMs` parameter
+- Uses AbortController for clean request cancellation
+
 **Error Handling**:
 - HTTP error parsing with meaningful messages
+- Timeout errors with clear messaging
 - Graceful fallbacks to prevent user code breakage
 - Retry logic considerations for production use
 
