@@ -5,9 +5,9 @@ describe('SpanStatus', () => {
   describe('initialization', () => {
     // Test both enum and string initialization (parameterized test equivalent)
     const testCases = [
-      { input: "OK", expected: SpanStatusCode.OK },
-      { input: "ERROR", expected: SpanStatusCode.ERROR },
-      { input: "UNSET", expected: SpanStatusCode.UNSET },
+      { input: 'OK', expected: SpanStatusCode.OK },
+      { input: 'ERROR', expected: SpanStatusCode.ERROR },
+      { input: 'UNSET', expected: SpanStatusCode.UNSET }
     ];
 
     testCases.forEach(({ input, expected }) => {
@@ -23,16 +23,16 @@ describe('SpanStatus', () => {
     const conversionTestCases = [
       {
         mlflowStatus: SpanStatusCode.OK,
-        otelStatus: OTelSpanStatusCode.OK,
+        otelStatus: OTelSpanStatusCode.OK
       },
       {
         mlflowStatus: SpanStatusCode.ERROR,
-        otelStatus: OTelSpanStatusCode.ERROR,
+        otelStatus: OTelSpanStatusCode.ERROR
       },
       {
         mlflowStatus: SpanStatusCode.UNSET,
-        otelStatus: OTelSpanStatusCode.UNSET,
-      },
+        otelStatus: OTelSpanStatusCode.UNSET
+      }
     ];
 
     conversionTestCases.forEach(({ mlflowStatus, otelStatus }) => {
@@ -48,9 +48,9 @@ describe('SpanStatus', () => {
   describe('toJson round-trip serialization', () => {
     it('should serialize and recreate status with all properties', () => {
       const originalStatus = new SpanStatus(SpanStatusCode.ERROR, 'Something went wrong');
-      
+
       const json = originalStatus.toJson();
-      
+
       // Verify JSON structure
       expect(json).toEqual({
         status_code: SpanStatusCode.ERROR,
@@ -86,16 +86,16 @@ describe('SpanStatus', () => {
 
     it('should handle status with minimal properties', () => {
       const originalStatus = new SpanStatus(SpanStatusCode.OK);
-      
+
       const json = originalStatus.toJson();
-      
+
       expect(json).toEqual({
         status_code: SpanStatusCode.OK,
         description: ''
       });
 
       const recreatedStatus = new SpanStatus(json.status_code, json.description);
-      
+
       expect(recreatedStatus.statusCode).toBe(originalStatus.statusCode);
       expect(recreatedStatus.description).toBe(originalStatus.description);
       expect(recreatedStatus.toJson()).toEqual(originalStatus.toJson());

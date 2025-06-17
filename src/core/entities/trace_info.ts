@@ -1,5 +1,5 @@
-import { TraceLocation } from './trace_location';
-import { TraceState } from './trace_state';
+import type { TraceLocation } from './trace_location';
+import type { TraceState } from './trace_state';
 
 /**
  * Metadata about a trace, such as its ID, location, timestamp, etc.
@@ -102,12 +102,16 @@ export class TraceInfo {
       client_request_id: this.clientRequestId,
       trace_location: {
         type: this.traceLocation.type,
-        mlflow_experiment: this.traceLocation.mlflowExperiment ? {
-          experiment_id: this.traceLocation.mlflowExperiment.experimentId
-        } : undefined,
-        inference_table: this.traceLocation.inferenceTable ? {
-          full_table_name: this.traceLocation.inferenceTable.fullTableName
-        } : undefined
+        mlflow_experiment: this.traceLocation.mlflowExperiment
+          ? {
+              experiment_id: this.traceLocation.mlflowExperiment.experimentId
+            }
+          : undefined,
+        inference_table: this.traceLocation.inferenceTable
+          ? {
+              full_table_name: this.traceLocation.inferenceTable.fullTableName
+            }
+          : undefined
       },
       request_preview: this.requestPreview,
       response_preview: this.responsePreview,
@@ -131,17 +135,23 @@ export class TraceInfo {
       clientRequestId: json.client_request_id,
       traceLocation: {
         type: json.trace_location?.type,
-        mlflowExperiment: json.trace_location?.mlflow_experiment ? {
-          experimentId: json.trace_location.mlflow_experiment.experiment_id
-        } : undefined,
-        inferenceTable: json.trace_location?.inference_table ? {
-          fullTableName: json.trace_location.inference_table.full_table_name
-        } : undefined
+        mlflowExperiment: json.trace_location?.mlflow_experiment
+          ? {
+              experimentId: json.trace_location.mlflow_experiment.experiment_id
+            }
+          : undefined,
+        inferenceTable: json.trace_location?.inference_table
+          ? {
+              fullTableName: json.trace_location.inference_table.full_table_name
+            }
+          : undefined
       },
       requestPreview: json.request_preview,
       responsePreview: json.response_preview,
       requestTime: json.request_time ? new Date(json.request_time).getTime() : Date.now(),
-      executionDuration: json.execution_duration ? parseFloat(json.execution_duration.replace('s', '')) * 1000 : undefined,
+      executionDuration: json.execution_duration
+        ? parseFloat(json.execution_duration.replace('s', '')) * 1000
+        : undefined,
       state: json.state,
       traceMetadata: json.trace_metadata || {},
       tags: json.tags || {},

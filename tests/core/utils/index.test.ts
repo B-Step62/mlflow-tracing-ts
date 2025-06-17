@@ -1,13 +1,10 @@
-import { LiveSpan } from '../../../src/core/entities/span';
+import type { LiveSpan } from '../../../src/core/entities/span';
 import { deduplicateSpanNamesInPlace } from '../../../src/core/utils';
 import { createTestSpan } from '../../helpers/span-helpers';
 
 describe('deduplicateSpanNamesInPlace', () => {
   it('should deduplicate spans with duplicate names', () => {
-    const spans = [
-      createTestSpan('red'),
-      createTestSpan('red'),
-    ];
+    const spans = [createTestSpan('red'), createTestSpan('red')];
 
     deduplicateSpanNamesInPlace(spans);
 
@@ -16,11 +13,7 @@ describe('deduplicateSpanNamesInPlace', () => {
   });
 
   it('should deduplicate only duplicate names, leaving unique names unchanged', () => {
-    const spans = [
-      createTestSpan('red'),
-      createTestSpan('red'),
-      createTestSpan('blue'),
-    ];
+    const spans = [createTestSpan('red'), createTestSpan('red'), createTestSpan('blue')];
 
     deduplicateSpanNamesInPlace(spans);
 
@@ -36,7 +29,7 @@ describe('deduplicateSpanNamesInPlace', () => {
       createTestSpan('red'),
       createTestSpan('green'),
       createTestSpan('blue'),
-      createTestSpan('red'),
+      createTestSpan('red')
     ];
     deduplicateSpanNamesInPlace(spans);
 
@@ -49,11 +42,7 @@ describe('deduplicateSpanNamesInPlace', () => {
   });
 
   it('should handle spans with no duplicates', () => {
-    const spans = [
-      createTestSpan('red'),
-      createTestSpan('blue'),
-      createTestSpan('green'),
-    ];
+    const spans = [createTestSpan('red'), createTestSpan('blue'), createTestSpan('green')];
 
     deduplicateSpanNamesInPlace(spans);
 

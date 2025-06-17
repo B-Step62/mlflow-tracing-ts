@@ -1,5 +1,5 @@
-import { LiveSpan, Span } from './entities/span';
-import { TraceInfo } from './entities/trace_info';
+import type { LiveSpan, Span } from './entities/span';
+import type { TraceInfo } from './entities/trace_info';
 import { Trace } from './entities/trace';
 import { TraceData } from './entities/trace_data';
 import { SpanAttributeKey } from './constants';
@@ -28,11 +28,13 @@ class _Trace {
       traceData.spans.push(span as Span);
     }
 
-    const root_span = traceData.spans.find(span => span.parentId === null);
+    const root_span = traceData.spans.find((span) => span.parentId === null);
     if (root_span) {
       // Accessing the OTel span directly get serialized value directly.
-      this.info.requestPreview = (root_span._span.attributes[SpanAttributeKey.INPUTS] || '') as string;
-      this.info.responsePreview = (root_span._span.attributes[SpanAttributeKey.OUTPUTS] || '') as string;
+      this.info.requestPreview = (root_span._span.attributes[SpanAttributeKey.INPUTS] ||
+        '') as string;
+      this.info.responsePreview = (root_span._span.attributes[SpanAttributeKey.OUTPUTS] ||
+        '') as string;
     }
 
     return new Trace(this.info, traceData);
@@ -51,7 +53,6 @@ export class InMemoryTraceManager {
   private _traces: Map<string, _Trace>;
   // Store mapping between OpenTelemetry trace ID and MLflow trace ID
   private _otelIdToMlflowTraceId: Map<string, string>;
-
 
   /**
    * Singleton pattern implementation
@@ -108,7 +109,6 @@ export class InMemoryTraceManager {
   getMlflowTraceIdFromOtelId(otelTraceId: string): string | null {
     return this._otelIdToMlflowTraceId.get(otelTraceId) || null;
   }
-
 
   /**
    * Get the span for the given trace ID and span ID.

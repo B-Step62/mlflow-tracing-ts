@@ -1,7 +1,10 @@
-import { TraceInfo } from "../core/entities/trace_info";
-import { Trace } from "../core/entities/trace";
-import { TraceData } from "../core/entities/trace_data";
-import { ArtifactCredentialInfo, GetCredentialsForTraceDataUploadResponse } from "../core/entities/artifact_credential_info";
+import { TraceInfo } from '../core/entities/trace_info';
+import { Trace } from '../core/entities/trace';
+import { TraceData } from '../core/entities/trace_data';
+import type {
+  ArtifactCredentialInfo,
+  GetCredentialsForTraceDataUploadResponse
+} from '../core/entities/artifact_credential_info';
 
 /**
  * Databricks client for MLflow tracing operations - implements the full
@@ -35,7 +38,7 @@ export class MlflowClient {
   private getAuthHeaders(): Record<string, string> {
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.token}`
+      Authorization: `Bearer ${this.token}`
     };
   }
 
@@ -78,28 +81,35 @@ export class MlflowClient {
     }
   }
 
-
   /**
    * Get credentials for uploading trace data
    * Endpoint: GET /api/2.0/mlflow/traces/{request_id}/credentials-for-data-upload
    */
-  private async getCredentialsForTraceDataUpload(requestId: string): Promise<ArtifactCredentialInfo> {
+  private async getCredentialsForTraceDataUpload(
+    requestId: string
+  ): Promise<ArtifactCredentialInfo> {
     const url = `${this.host}/api/2.0/mlflow/traces/${requestId}/credentials-for-data-upload`;
-    const response = await this.makeRequest('GET', url) as GetCredentialsForTraceDataUploadResponse;
+    const response = (await this.makeRequest(
+      'GET',
+      url
+    )) as GetCredentialsForTraceDataUploadResponse;
     return response.credential_info;
   }
 
   /**
    * Upload data to cloud storage using the provided credentials
    */
-  private async uploadToCloudStorage(credentials: ArtifactCredentialInfo, data: string): Promise<void> {
+  private async uploadToCloudStorage(
+    credentials: ArtifactCredentialInfo,
+    data: string
+  ): Promise<void> {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json'
     };
 
     // Add headers from credentials (if they exist)
     if (credentials.headers && Array.isArray(credentials.headers)) {
-      credentials.headers.forEach(header => {
+      credentials.headers.forEach((header) => {
         headers[header.name] = header.value;
       });
     }
@@ -112,7 +122,9 @@ export class MlflowClient {
       // TODO: Implement Azure upload
       case 'AZURE_SAS_URI':
       case 'AZURE_ADLS_GEN2_SAS_URI':
-        throw new Error(`Azure upload not yet implemented for credential type: ${credentials.type}`);
+        throw new Error(
+          `Azure upload not yet implemented for credential type: ${credentials.type}`
+        );
       default:
         throw new Error(`Unsupported credential type: ${credentials.type}`);
     }
@@ -135,14 +147,16 @@ export class MlflowClient {
       });
 
       if (!response.ok) {
-        throw new Error(`${credentialType} upload failed: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `${credentialType} upload failed: ${response.status} ${response.statusText}`
+        );
       }
     } catch (error) {
       throw new Error(`Failed to upload to ${credentialType}: ${(error as Error).message}`);
     }
   }
 
-    // === TRACE RETRIEVAL METHODS ===
+  // === TRACE RETRIEVAL METHODS ===
 
   /**
    * Get a single trace by ID
@@ -165,7 +179,7 @@ export class MlflowClient {
     const response = await this.makeRequest('GET', url);
 
     // The V3 API returns a Trace object with trace_info field
-    if (response.trace && response.trace.trace_info) {
+    if (response.trace?.trace_info) {
       return TraceInfo.fromJson(response.trace.trace_info);
     }
 
@@ -194,7 +208,9 @@ export class MlflowClient {
    * Get credentials for downloading trace data
    * Endpoint: GET /mlflow/traces/{request_id}/credentials-for-data-download
    */
-  private async getCredentialsForTraceDataDownload(requestId: string): Promise<ArtifactCredentialInfo> {
+  private async getCredentialsForTraceDataDownload(
+    requestId: string
+  ): Promise<ArtifactCredentialInfo> {
     const url = `${this.host}/api/2.0/mlflow/traces/${requestId}/credentials-for-data-download`;
 
     const response = await this.makeRequest('GET', url);
@@ -214,7 +230,7 @@ export class MlflowClient {
 
     // Add headers from credentials (if they exist)
     if (credentials.headers && Array.isArray(credentials.headers)) {
-      credentials.headers.forEach(header => {
+      credentials.headers.forEach((header) => {
         headers[header.name] = header.value;
       });
     }
@@ -248,11 +264,7 @@ export class MlflowClient {
 
   // === PRIVATE HELPER METHODS ===
 
-  private async makeRequest(
-    method: string,
-    url: string,
-    body?: any
-  ): Promise<any> {
+  private async makeRequest(method: string, url: string, body?: any): Promise<any> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 

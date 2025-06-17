@@ -1,5 +1,5 @@
+import type { TraceLocation } from '../../../src/core/entities/trace_location';
 import {
-  TraceLocation,
   TraceLocationType,
   createTraceLocationFromExperimentId
 } from '../../../src/core/entities/trace_location';

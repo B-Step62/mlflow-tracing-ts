@@ -1,4 +1,5 @@
-import { SpanStatusCode as OTelSpanStatusCode, SpanStatus as OTelStatus } from '@opentelemetry/api';
+import type { SpanStatus as OTelStatus } from '@opentelemetry/api';
+import { SpanStatusCode as OTelSpanStatusCode } from '@opentelemetry/api';
 
 /**
  * MLflow Span Status module
@@ -6,7 +7,6 @@ import { SpanStatusCode as OTelSpanStatusCode, SpanStatus as OTelStatus } from '
  * This module provides the MLflow SpanStatusCode enum and SpanStatus class,
  * matching the Python MLflow implementation.
  */
-
 
 /**
  * Enum for status code of a span
@@ -47,7 +47,7 @@ export class SpanStatus {
       if (!Object.values(SpanStatusCode).includes(statusCode as SpanStatusCode)) {
         throw new Error(
           `${statusCode} is not a valid SpanStatusCode value. ` +
-          `Please use one of [${Object.values(SpanStatusCode).join(', ')}]`
+            `Please use one of [${Object.values(SpanStatusCode).join(', ')}]`
         );
       }
       this.statusCode = statusCode as SpanStatusCode;

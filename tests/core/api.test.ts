@@ -7,13 +7,10 @@ import { InMemoryTraceManager } from '../../src/core/trace_manager';
 import { getTraces, resetTraces } from '../../src/exporters/mlflow';
 import { convertHrTimeToNanoSeconds } from '../../src/core/utils';
 
-
-
 describe('API', () => {
-
   describe('startSpan', () => {
     it('should create a span with span type', () => {
-      const span = startSpan({name: 'test-span'});
+      const span = startSpan({ name: 'test-span' });
       expect(span).toBeInstanceOf(LiveSpan);
 
       span.setInputs({ prompt: 'Hello, world!' });
@@ -23,7 +20,7 @@ describe('API', () => {
       span.end();
 
       // Validate traces pushed to the in-memory buffer
-      const traces = getTraces()
+      const traces = getTraces();
       expect(traces.length).toBe(1);
 
       const trace = traces[0];
@@ -42,95 +39,97 @@ describe('API', () => {
       expect(loggedSpan.inputs).toEqual({ prompt: 'Hello, world!' });
       expect(loggedSpan.outputs).toEqual({ response: 'Hello, world!' });
       expect(loggedSpan.attributes['model']).toBe('gpt-4');
-      expect(convertHrTimeToNanoSeconds(loggedSpan.startTime)).toBe(convertHrTimeToNanoSeconds(span.startTime));
-      expect(convertHrTimeToNanoSeconds(loggedSpan.endTime!)).toBe(convertHrTimeToNanoSeconds(span.endTime!));
+      expect(convertHrTimeToNanoSeconds(loggedSpan.startTime)).toBe(
+        convertHrTimeToNanoSeconds(span.startTime)
+      );
+      expect(convertHrTimeToNanoSeconds(loggedSpan.endTime!)).toBe(
+        convertHrTimeToNanoSeconds(span.endTime!)
+      );
       expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.OK);
     });
 
-
     it('should create a span with other options', () => {
-        const span = startSpan({
-            name: 'test-span',
-            span_type: SpanType.LLM,
-            inputs: { prompt: 'Hello, world!' },
-            attributes: { model: 'gpt-4' },
-            startTimeNs: 1e9  // 1 second (still input parameter)
-        });
-        span.end({
-            outputs: { response: 'Hello, world!' },
-            attributes: { model: 'gpt-4' },
-            status: SpanStatusCode.ERROR,
-            endTimeNs: 3e9  // 3 seconds (still input parameter)
-        });
+      const span = startSpan({
+        name: 'test-span',
+        span_type: SpanType.LLM,
+        inputs: { prompt: 'Hello, world!' },
+        attributes: { model: 'gpt-4' },
+        startTimeNs: 1e9 // 1 second (still input parameter)
+      });
+      span.end({
+        outputs: { response: 'Hello, world!' },
+        attributes: { model: 'gpt-4' },
+        status: SpanStatusCode.ERROR,
+        endTimeNs: 3e9 // 3 seconds (still input parameter)
+      });
 
-        // Validate traces pushed to the in-memory buffer
-        const traces = getTraces();
-        expect(traces.length).toBe(1);
+      // Validate traces pushed to the in-memory buffer
+      const traces = getTraces();
+      expect(traces.length).toBe(1);
 
-        const trace = traces[0];
-        expect(trace.info.traceId).toBe(span.traceId);
-        expect(trace.info.state).toBe(TraceState.ERROR);
-        expect(trace.info.requestTime).toBeCloseTo(1e3); // requestTime is in milliseconds
-        expect(trace.info.executionDuration).toBeCloseTo(2e3); // executionDuration is in milliseconds
+      const trace = traces[0];
+      expect(trace.info.traceId).toBe(span.traceId);
+      expect(trace.info.state).toBe(TraceState.ERROR);
+      expect(trace.info.requestTime).toBeCloseTo(1e3); // requestTime is in milliseconds
+      expect(trace.info.executionDuration).toBeCloseTo(2e3); // executionDuration is in milliseconds
 
-        const loggedSpan = trace.data.spans[0];
-        expect(loggedSpan.traceId).toBe(span.traceId);
-        expect(loggedSpan.name).toBe('test-span');
-        expect(loggedSpan.spanType).toBe(SpanType.LLM);
-        expect(loggedSpan.inputs).toEqual({ prompt: 'Hello, world!' });
-        expect(loggedSpan.outputs).toEqual({ response: 'Hello, world!' });
-        expect(loggedSpan.attributes['model']).toBe('gpt-4');
-        expect(convertHrTimeToNanoSeconds(loggedSpan.startTime)).toBe(1e9);
-        expect(convertHrTimeToNanoSeconds(loggedSpan.endTime!)).toBe(3e9);
-        expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.ERROR);
+      const loggedSpan = trace.data.spans[0];
+      expect(loggedSpan.traceId).toBe(span.traceId);
+      expect(loggedSpan.name).toBe('test-span');
+      expect(loggedSpan.spanType).toBe(SpanType.LLM);
+      expect(loggedSpan.inputs).toEqual({ prompt: 'Hello, world!' });
+      expect(loggedSpan.outputs).toEqual({ response: 'Hello, world!' });
+      expect(loggedSpan.attributes['model']).toBe('gpt-4');
+      expect(convertHrTimeToNanoSeconds(loggedSpan.startTime)).toBe(1e9);
+      expect(convertHrTimeToNanoSeconds(loggedSpan.endTime!)).toBe(3e9);
+      expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.ERROR);
     });
 
     it('should create a span with an exception', () => {
-        const span = startSpan({name: 'test-span', span_type: SpanType.LLM});
-        expect(span).toBeInstanceOf(LiveSpan);
+      const span = startSpan({ name: 'test-span', span_type: SpanType.LLM });
+      expect(span).toBeInstanceOf(LiveSpan);
 
-        span.recordException(new Error('test-error'));
-        span.end({status: new SpanStatus(SpanStatusCode.ERROR, 'test-error')});
+      span.recordException(new Error('test-error'));
+      span.end({ status: new SpanStatus(SpanStatusCode.ERROR, 'test-error') });
 
-        // Validate traces pushed to the in-memory buffer
-        const traces = getTraces()
-        expect(traces.length).toBe(1);
+      // Validate traces pushed to the in-memory buffer
+      const traces = getTraces();
+      expect(traces.length).toBe(1);
 
-        const trace = traces[0];
-        expect(trace.info.traceId).toBe(span.traceId);
-        expect(trace.info.state).toBe(TraceState.ERROR);
-        const spanStartNs = convertHrTimeToNanoSeconds(span.startTime);
-        const spanEndNs = convertHrTimeToNanoSeconds(span.endTime!);
-        expect(trace.info.requestTime).toBeCloseTo(spanStartNs / 1000000);
-        expect(trace.info.executionDuration).toBeCloseTo((spanEndNs - spanStartNs) / 1000000);
-        expect(trace.data.spans.length).toBe(1);
+      const trace = traces[0];
+      expect(trace.info.traceId).toBe(span.traceId);
+      expect(trace.info.state).toBe(TraceState.ERROR);
+      const spanStartNs = convertHrTimeToNanoSeconds(span.startTime);
+      const spanEndNs = convertHrTimeToNanoSeconds(span.endTime!);
+      expect(trace.info.requestTime).toBeCloseTo(spanStartNs / 1000000);
+      expect(trace.info.executionDuration).toBeCloseTo((spanEndNs - spanStartNs) / 1000000);
+      expect(trace.data.spans.length).toBe(1);
 
-        const loggedSpan = trace.data.spans[0];
-        expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.ERROR);
-        expect(loggedSpan.status?.description).toBe('test-error');
+      const loggedSpan = trace.data.spans[0];
+      expect(loggedSpan.status?.statusCode).toBe(SpanStatusCode.ERROR);
+      expect(loggedSpan.status?.description).toBe('test-error');
     });
 
     it('should create nested spans', () => {
-      const parentSpan = startSpan({name: 'parent-span'});
-      const childSpan1 = startSpan({name: 'child-span-1', parent: parentSpan});
+      const parentSpan = startSpan({ name: 'parent-span' });
+      const childSpan1 = startSpan({ name: 'child-span-1', parent: parentSpan });
       childSpan1.end();
 
-      const childSpan2 = startSpan({name: 'child-span-2', parent: parentSpan});
+      const childSpan2 = startSpan({ name: 'child-span-2', parent: parentSpan });
 
-      const childSpan3 = startSpan({name: 'child-span-3', parent: childSpan2});
+      const childSpan3 = startSpan({ name: 'child-span-3', parent: childSpan2 });
       childSpan3.end();
 
       childSpan2.end();
 
       // This should not be a child of parentSpan
-      const independentSpan = startSpan({name: 'independent-span'});
+      const independentSpan = startSpan({ name: 'independent-span' });
       independentSpan.end();
 
       parentSpan.end();
 
       const traces = getTraces();
       expect(traces.length).toBe(2);
-
 
       const trace1 = traces[0];
       expect(trace1.data.spans.length).toBe(1);
@@ -153,7 +152,7 @@ describe('API', () => {
       it('should execute synchronous callback and auto-set outputs', () => {
         const result = withSpan((span) => {
           span.setInputs({ a: 5, b: 3 });
-          return 5 + 3;  // Auto-set outputs from return value
+          return 5 + 3; // Auto-set outputs from return value
         });
 
         expect(result).toBe(8);
@@ -188,7 +187,7 @@ describe('API', () => {
       it('should execute asynchronous callback and auto-set outputs', async () => {
         const result = await withSpan(async (span) => {
           span.setInputs({ delay: 100 });
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 10));
           const value = 'async result';
           return value;
         });
@@ -224,7 +223,7 @@ describe('API', () => {
         await expect(
           withSpan(async (span) => {
             span.setInputs({ operation: 'async error' });
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, 10));
             throw new Error('Async error');
           })
         ).rejects.toThrow('Async error');
@@ -247,7 +246,9 @@ describe('API', () => {
             inputs: { a: 10, b: 20 },
             attributes: { model: 'test-model' }
           },
-          () => { return 10 + 20; }
+          () => {
+            return 10 + 20;
+          }
         );
 
         expect(result).toBe(30);
@@ -271,7 +272,7 @@ describe('API', () => {
             attributes: { version: '1.0' }
           },
           async () => {
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, 10));
             return 'processed-test';
           }
         );
@@ -318,11 +319,11 @@ describe('API', () => {
         expect(traces.length).toBe(1);
         expect(traces[0].data.spans.length).toBe(2);
 
-        const parentSpan = traces[0].data.spans.find(s => s.name === 'parent');
+        const parentSpan = traces[0].data.spans.find((s) => s.name === 'parent');
         expect(parentSpan?.inputs).toEqual({ operation: 'parent operation' });
         expect(parentSpan?.outputs).toEqual({ childResult: 'child result' });
 
-        const childSpan = traces[0].data.spans.find(s => s.name === 'child');
+        const childSpan = traces[0].data.spans.find((s) => s.name === 'child');
         expect(childSpan?.parentId).toBe(parentSpan?.spanId);
         expect(childSpan?.inputs).toEqual({ nested: true });
         expect(childSpan?.outputs).toEqual('child result');
@@ -373,6 +374,3 @@ describe('API', () => {
     resetTraces();
   });
 });
-
-
-

@@ -1,4 +1,5 @@
-import { ISpan, Span } from './span';
+import type { ISpan } from './span';
+import { Span } from './span';
 
 /**
  * Represents the spans and associated data for a trace
@@ -8,7 +9,6 @@ export class TraceData {
    * The spans that make up this trace
    */
   spans: ISpan[];
-
 
   /**
    * Create a new TraceData instance
@@ -24,7 +24,7 @@ export class TraceData {
    */
   toJson(): any {
     return {
-      spans: this.spans.map(span => span.toJson ? span.toJson() : span)
+      spans: this.spans.map((span) => (span.toJson ? span.toJson() : span))
     };
   }
 

@@ -26,9 +26,9 @@ describe('Trace', () => {
     it('should create a Trace with info and data', () => {
       const traceInfo = createMockTraceInfo();
       const traceData = createMockTraceData();
-      
+
       const trace = new Trace(traceInfo, traceData);
-      
+
       expect(trace.info).toBe(traceInfo);
       expect(trace.data).toBe(traceData);
     });
@@ -39,9 +39,9 @@ describe('Trace', () => {
       const originalTraceInfo = createMockTraceInfo();
       const originalTraceData = createMockTraceData();
       const originalTrace = new Trace(originalTraceInfo, originalTraceData);
-      
+
       const json = originalTrace.toJson();
-      
+
       // Verify JSON structure
       expect(json).toHaveProperty('trace_info');
       expect(json).toHaveProperty('trace_data');
@@ -56,31 +56,31 @@ describe('Trace', () => {
 
       // Round-trip test
       const recreatedTrace = Trace.fromJson(json);
-      
+
       expect(recreatedTrace).toBeInstanceOf(Trace);
       expect(recreatedTrace.info).toBeInstanceOf(TraceInfo);
       expect(recreatedTrace.data).toBeInstanceOf(TraceData);
-      
+
       // Verify that key properties are preserved
       expect(recreatedTrace.info.traceId).toBe(originalTrace.info.traceId);
       expect(recreatedTrace.info.state).toBe(originalTrace.info.state);
       expect(recreatedTrace.data.spans).toEqual(originalTrace.data.spans);
-      
+
       // Verify round-trip JSON serialization matches
       expect(recreatedTrace.toJson()).toEqual(originalTrace.toJson());
     });
 
     it('should handle different trace_info/trace_data field names in JSON', () => {
       const originalTrace = new Trace(createMockTraceInfo(), createMockTraceData());
-      
+
       // Test with alternative field names (info/data instead of trace_info/trace_data)
       const alternativeJson = {
         info: originalTrace.info.toJson(),
         data: originalTrace.data.toJson()
       };
-      
+
       const recreatedTrace = Trace.fromJson(alternativeJson);
-      
+
       expect(recreatedTrace).toBeInstanceOf(Trace);
       expect(recreatedTrace.info.traceId).toBe(originalTrace.info.traceId);
       expect(recreatedTrace.data.spans).toEqual(originalTrace.data.spans);
@@ -93,12 +93,12 @@ describe('Trace', () => {
         requestTime: 1234567890000,
         state: TraceState.OK,
         executionDuration: 2500,
-        traceMetadata: { 
+        traceMetadata: {
           model: 'gpt-4',
           version: '1.0',
           source: 'api'
         },
-        tags: { 
+        tags: {
           environment: 'production',
           team: 'ai-platform',
           priority: 'high'
@@ -107,31 +107,27 @@ describe('Trace', () => {
         responsePreview: '{"response": "Hi there"}',
         clientRequestId: 'req-123'
       });
-      
+
       const originalTrace = new Trace(complexTraceInfo, createMockTraceData());
-      
+
       const json = originalTrace.toJson();
       const recreatedTrace = Trace.fromJson(json);
-      
+
       // Verify complex metadata preservation
       expect(recreatedTrace.info.traceMetadata).toEqual(complexTraceInfo.traceMetadata);
       expect(recreatedTrace.info.tags).toEqual(complexTraceInfo.tags);
       expect(recreatedTrace.info.requestPreview).toBe(complexTraceInfo.requestPreview);
       expect(recreatedTrace.info.responsePreview).toBe(complexTraceInfo.responsePreview);
       expect(recreatedTrace.info.clientRequestId).toBe(complexTraceInfo.clientRequestId);
-      
+
       // Verify round-trip consistency
       expect(recreatedTrace.toJson()).toEqual(originalTrace.toJson());
     });
 
     it('should handle traces with different states', () => {
-      const states = [
-        TraceState.IN_PROGRESS,
-        TraceState.OK,
-        TraceState.ERROR
-      ];
+      const states = [TraceState.IN_PROGRESS, TraceState.OK, TraceState.ERROR];
 
-      states.forEach(state => {
+      states.forEach((state) => {
         const traceInfo = new TraceInfo({
           traceId: `tr-${state}`,
           traceLocation: createTraceLocationFromExperimentId('exp-123'),
@@ -140,11 +136,11 @@ describe('Trace', () => {
           traceMetadata: {},
           tags: {}
         });
-        
+
         const originalTrace = new Trace(traceInfo, createMockTraceData());
         const json = originalTrace.toJson();
         const recreatedTrace = Trace.fromJson(json);
-        
+
         expect(recreatedTrace.info.state).toBe(state);
         expect(recreatedTrace.toJson()).toEqual(originalTrace.toJson());
       });

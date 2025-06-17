@@ -5,10 +5,10 @@ describe('SpanEvent', () => {
     it('should create a span event with all parameters', () => {
       const timestamp = Date.now() * 1000; // microseconds
       const attributes = {
-        'key1': 'value1',
-        'key2': 42,
-        'key3': true,
-        'key4': ['a', 'b', 'c']
+        key1: 'value1',
+        key2: 42,
+        key3: true,
+        key4: ['a', 'b', 'c']
       };
 
       const event = new SpanEvent({
@@ -41,28 +41,28 @@ describe('SpanEvent', () => {
         name: 'test_event',
         timestamp: 1234567890000,
         attributes: {
-          'string_attr': 'test_value',
-          'number_attr': 42,
-          'boolean_attr': true,
-          'string_array': ['a', 'b', 'c'],
-          'number_array': [1, 2, 3],
-          'boolean_array': [true, false, true]
+          string_attr: 'test_value',
+          number_attr: 42,
+          boolean_attr: true,
+          string_array: ['a', 'b', 'c'],
+          number_array: [1, 2, 3],
+          boolean_array: [true, false, true]
         }
       });
 
       const json = originalEvent.toJson();
-      
+
       // Verify JSON structure
       expect(json).toEqual({
         name: 'test_event',
         timestamp: 1234567890000,
         attributes: {
-          'string_attr': 'test_value',
-          'number_attr': 42,
-          'boolean_attr': true,
-          'string_array': ['a', 'b', 'c'],
-          'number_array': [1, 2, 3],
-          'boolean_array': [true, false, true]
+          string_attr: 'test_value',
+          number_attr: 42,
+          boolean_attr: true,
+          string_array: ['a', 'b', 'c'],
+          number_array: [1, 2, 3],
+          boolean_array: [true, false, true]
         }
       });
 
@@ -86,7 +86,7 @@ describe('SpanEvent', () => {
       });
 
       const json = originalEvent.toJson();
-      
+
       expect(json.name).toBe('minimal_event');
       expect(json.timestamp).toBeGreaterThan(0);
       expect(json.attributes).toEqual({});

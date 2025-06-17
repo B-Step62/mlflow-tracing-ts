@@ -18,7 +18,7 @@ function createTestTraceInfo(traceId: string): TraceInfo {
     requestPreview: undefined,
     responsePreview: undefined,
     traceMetadata: {},
-    tags: {},
+    tags: {}
   });
 }
 
@@ -34,41 +34,41 @@ describe('InMemoryTraceManager', () => {
   });
 
   it('should return the same instance when called multiple times', () => {
-      const obj1 = InMemoryTraceManager.getInstance();
-      const obj2 = InMemoryTraceManager.getInstance();
-      expect(obj1).toBe(obj2);
+    const obj1 = InMemoryTraceManager.getInstance();
+    const obj2 = InMemoryTraceManager.getInstance();
+    expect(obj1).toBe(obj2);
   });
 
   it('should add spans and pop traces correctly', () => {
-      const traceManager = InMemoryTraceManager.getInstance();
+    const traceManager = InMemoryTraceManager.getInstance();
 
-      // Add a new trace info
-      const traceId = 'tr-1';
-      const otelTraceId = '12345';
-      traceManager.registerTrace(otelTraceId, createTestTraceInfo(traceId));
+    // Add a new trace info
+    const traceId = 'tr-1';
+    const otelTraceId = '12345';
+    traceManager.registerTrace(otelTraceId, createTestTraceInfo(traceId));
 
-      // Add a span for a new trace
-      const span11 = createTestSpan('test', traceId, 'span11');
-      traceManager.registerSpan(span11);
+    // Add a span for a new trace
+    const span11 = createTestSpan('test', traceId, 'span11');
+    traceManager.registerSpan(span11);
 
-      expect(traceManager.getTrace(traceId)).toBeTruthy();
-      const trace1 = traceManager.getTrace(traceId);
-      expect(trace1?.info.traceId).toBe(traceId);
-      expect(trace1?.spanDict.size).toBe(1);
+    expect(traceManager.getTrace(traceId)).toBeTruthy();
+    const trace1 = traceManager.getTrace(traceId);
+    expect(trace1?.info.traceId).toBe(traceId);
+    expect(trace1?.spanDict.size).toBe(1);
 
-      // Add more spans to the same trace
-      const span111 = createTestSpan('test', traceId, 'span111');
-      const span112 = createTestSpan('test', traceId, 'span112');
-      traceManager.registerSpan(span111);
-      traceManager.registerSpan(span112);
-      expect(trace1?.spanDict.size).toBe(3);
+    // Add more spans to the same trace
+    const span111 = createTestSpan('test', traceId, 'span111');
+    const span112 = createTestSpan('test', traceId, 'span112');
+    traceManager.registerSpan(span111);
+    traceManager.registerSpan(span112);
+    expect(trace1?.spanDict.size).toBe(3);
 
-      // Pop the trace data
-      const poppedTrace1 = traceManager.popTrace(otelTraceId);
-      expect(poppedTrace1).toBeInstanceOf(Trace);
-      expect(poppedTrace1?.info.traceId).toBe(traceId);
-      expect(poppedTrace1?.data.spans.length).toBe(3);
-      expect(traceManager.getTrace(traceId)).toBeNull();
-      expect(poppedTrace1?.data.spans[0]).toBeInstanceOf(Span);
+    // Pop the trace data
+    const poppedTrace1 = traceManager.popTrace(otelTraceId);
+    expect(poppedTrace1).toBeInstanceOf(Trace);
+    expect(poppedTrace1?.info.traceId).toBe(traceId);
+    expect(poppedTrace1?.data.spans.length).toBe(3);
+    expect(traceManager.getTrace(traceId)).toBeNull();
+    expect(poppedTrace1?.data.spans[0]).toBeInstanceOf(Span);
   });
 });

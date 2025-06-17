@@ -1,19 +1,20 @@
-
-
-import { Trace } from '../core/entities/trace';
-import { ExportResult } from '@opentelemetry/core';
-import { SpanProcessor, ReadableSpan as OTelReadableSpan, SpanExporter, Span as OTelSpan } from '@opentelemetry/sdk-trace-node';
-import { Context } from '@opentelemetry/api';
+import type { Trace } from '../core/entities/trace';
+import type { ExportResult } from '@opentelemetry/core';
+import type {
+  SpanProcessor,
+  ReadableSpan as OTelReadableSpan,
+  SpanExporter,
+  Span as OTelSpan
+} from '@opentelemetry/sdk-trace-node';
+import type { Context } from '@opentelemetry/api';
 import { InMemoryTraceManager } from '../core/trace_manager';
 import { TraceInfo } from '../core/entities/trace_info';
 import { createTraceLocationFromExperimentId } from '../core/entities/trace_location';
 import { fromOtelStatus, TraceState } from '../core/entities/trace_state';
 import { SpanAttributeKey, TRACE_ID_PREFIX } from '../core/constants';
 import { convertHrTimeToNanoSeconds, deduplicateSpanNamesInPlace } from '../core/utils';
-import { MlflowClient } from '../clients';
+import type { MlflowClient } from '../clients';
 import { getConfig } from '../core/config';
-
-
 
 // TODO: Remove these once we have a proper exporter.
 let _traces: Trace[] = [];
@@ -32,7 +33,6 @@ function generateTraceId(span: OTelSpan): string {
   // NB: trace Id is already hex string in Typescript OpenTelemetry SDK
   return TRACE_ID_PREFIX + span.spanContext().traceId;
 }
-
 
 export class MlflowSpanProcessor implements SpanProcessor {
   private _exporter: SpanExporter;
@@ -66,7 +66,7 @@ export class MlflowSpanProcessor implements SpanProcessor {
         state: TraceState.IN_PROGRESS,
         traceMetadata: {},
         tags: {},
-        assessments: [],
+        assessments: []
       });
       InMemoryTraceManager.getInstance().registerTrace(otelTraceId, trace_info);
     } else {
@@ -115,7 +115,7 @@ export class MlflowSpanProcessor implements SpanProcessor {
    */
   updateTraceInfo(traceInfo: TraceInfo, span: OTelReadableSpan): void {
     const endTimeNano = convertHrTimeToNanoSeconds(span.endTime);
-    traceInfo.executionDuration = (endTimeNano / 1e6) - traceInfo.requestTime;
+    traceInfo.executionDuration = endTimeNano / 1e6 - traceInfo.requestTime;
     traceInfo.state = fromOtelStatus(span.status.code);
   }
 
@@ -137,14 +137,12 @@ export class MlflowSpanProcessor implements SpanProcessor {
   }
 }
 
-
 export class MlflowSpanExporter implements SpanExporter {
   private _client: MlflowClient;
 
   constructor(client: MlflowClient) {
     this._client = client;
   }
-
 
   export(
     spans: OTelReadableSpan[],
@@ -170,7 +168,6 @@ export class MlflowSpanExporter implements SpanExporter {
       this.exportTraceToBackend(trace).catch((error) => {
         console.error(`Failed to export trace ${trace.info.traceId}:`, error);
       });
-
     }
   }
 

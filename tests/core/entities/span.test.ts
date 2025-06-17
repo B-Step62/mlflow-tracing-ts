@@ -1,6 +1,7 @@
 import { trace } from '@opentelemetry/api';
 import { BasicTracerProvider } from '@opentelemetry/sdk-trace-base';
-import { createMlflowSpan, Span, NoOpSpan, LiveSpan } from '../../../src/core/entities/span';
+import type { LiveSpan } from '../../../src/core/entities/span';
+import { createMlflowSpan, Span, NoOpSpan } from '../../../src/core/entities/span';
 import { SpanEvent } from '../../../src/core/entities/span_event';
 import { SpanStatus, SpanStatusCode } from '../../../src/core/entities/span_status';
 import { SpanAttributeKey, SpanType } from '../../../src/core/constants';
@@ -105,7 +106,7 @@ describe('Span', () => {
           expect(events.length).toBeGreaterThan(0);
 
           // Find our test event
-          const testEvent = events.find(e => e.name === 'test_event');
+          const testEvent = events.find((e) => e.name === 'test_event');
           expect(testEvent).toBeDefined();
           expect(testEvent?.attributes).toEqual({ foo: 'bar' });
         } finally {
@@ -190,7 +191,6 @@ describe('Span', () => {
           attributes: { eventAttr: 'value' }
         });
         mlflowSpan.addEvent(event);
-
       } finally {
         span.end();
       }
@@ -209,7 +209,7 @@ describe('Span', () => {
       expect(json).toHaveProperty('events');
 
       // Validate that attributes exist and have correct values
-      expect(json.attributes['mlflow.spanInputs']).toEqual({x: 1});
+      expect(json.attributes['mlflow.spanInputs']).toEqual({ x: 1 });
       expect(json.attributes['mlflow.spanOutputs']).toBe(2);
       expect(json.attributes['mlflow.spanType']).toBe('LLM');
       expect(json.attributes['mlflow.traceRequestId']).toBe(traceId);
@@ -235,23 +235,23 @@ describe('Span', () => {
     it('should match expected JSON format from real MLflow data', () => {
       // Create a span that matches the real MLflow data structure
       const expectedSpanData = {
-        trace_id: "rZo9DIws+6d2tejICXD4gw==",
-        span_id: "DOD2qjZ6ZrU=",
-        trace_state: "",
-        parent_span_id: "",
-        name: "python",
+        trace_id: 'rZo9DIws+6d2tejICXD4gw==',
+        span_id: 'DOD2qjZ6ZrU=',
+        trace_state: '',
+        parent_span_id: '',
+        name: 'python',
         start_time_unix_nano: 1749996461282772491,
         end_time_unix_nano: 1749996461365717111,
         attributes: {
-          "mlflow.spanOutputs": "2",
-          "mlflow.spanType": "\"LLM\"",
-          "mlflow.spanInputs": "{\"x\": 1}",
-          "mlflow.traceRequestId": "\"tr-ad9a3d0c8c2cfba776b5e8c80970f883\"",
-          "mlflow.spanFunctionName": "\"f\""
+          'mlflow.spanOutputs': '2',
+          'mlflow.spanType': '"LLM"',
+          'mlflow.spanInputs': '{"x": 1}',
+          'mlflow.traceRequestId': '"tr-ad9a3d0c8c2cfba776b5e8c80970f883"',
+          'mlflow.spanFunctionName': '"f"'
         },
         status: {
-          message: "",
-          code: "STATUS_CODE_OK"
+          message: '',
+          code: 'STATUS_CODE_OK'
         },
         events: []
       };
@@ -270,7 +270,7 @@ describe('Span', () => {
       expect(span.parentId).toBeNull();
       expect(span.status.statusCode).toBe(SpanStatusCode.OK);
       expect(span.status.description).toBe('');
-      expect(span.inputs).toStrictEqual({x: 1});
+      expect(span.inputs).toStrictEqual({ x: 1 });
       expect(span.outputs).toBe(2);
       expect(span.events).toEqual([]);
     });
@@ -288,7 +288,6 @@ describe('Span', () => {
         mlflowSpan.setAttribute('custom.attribute', 'custom_value');
         mlflowSpan.setAttribute('numeric.attribute', 123);
         mlflowSpan.setStatus(SpanStatusCode.OK);
-
       } finally {
         span.end();
       }
@@ -300,11 +299,14 @@ describe('Span', () => {
       // Create new span from JSON
       const reconstructedSpan = Span.fromJson(originalJson);
 
-
       // Key properties should match
       expect(reconstructedSpan.name).toBe(originalSpan.name);
-      expect(convertHrTimeToNanoSeconds(reconstructedSpan.startTime)).toBe(convertHrTimeToNanoSeconds(originalSpan.startTime));
-      expect(convertHrTimeToNanoSeconds(reconstructedSpan.endTime!)).toBe(convertHrTimeToNanoSeconds(originalSpan.endTime!));
+      expect(convertHrTimeToNanoSeconds(reconstructedSpan.startTime)).toBe(
+        convertHrTimeToNanoSeconds(originalSpan.startTime)
+      );
+      expect(convertHrTimeToNanoSeconds(reconstructedSpan.endTime!)).toBe(
+        convertHrTimeToNanoSeconds(originalSpan.endTime!)
+      );
       expect(reconstructedSpan.parentId).toBe(originalSpan.parentId);
 
       // Attributes should be preserved

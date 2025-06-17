@@ -1,8 +1,8 @@
-import path from "path";
-import fs from "fs";
-import os from "os";
-import { parse as parseIni } from "ini";
-import { reinitializeSDK } from "./provider";
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
+import { parse as parseIni } from 'ini';
+import { reinitializeSDK } from './provider';
 
 /**
  * Configuration options for the MLflow tracing SDK
@@ -95,19 +95,19 @@ let globalConfig: MLflowTracingConfig | null = null;
  */
 export function configure(config: MLflowTracingConfig): void {
   if (!config.tracking_uri) {
-    throw new Error("tracking_uri is required in configuration");
+    throw new Error('tracking_uri is required in configuration');
   }
 
   if (!config.experiment_id) {
-    throw new Error("experiment_id is required in configuration");
+    throw new Error('experiment_id is required in configuration');
   }
 
   if (typeof config.tracking_uri !== 'string') {
-    throw new Error("tracking_uri must be a string");
+    throw new Error('tracking_uri must be a string');
   }
 
   if (typeof config.experiment_id !== 'string') {
-    throw new Error("experiment_id must be a string");
+    throw new Error('experiment_id must be a string');
   }
 
   // Set default Databricks config path if not provided
@@ -138,7 +138,7 @@ export function configure(config: MLflowTracingConfig): void {
       } catch (error) {
         throw new Error(
           `Failed to read Databricks configuration for profile '${profile}': ${(error as Error).message}. ` +
-          `Make sure your ${config.databricks_config_path} file exists and contains valid credentials.`
+            `Make sure your ${config.databricks_config_path} file exists and contains valid credentials.`
         );
       }
     }
@@ -157,7 +157,7 @@ export function configure(config: MLflowTracingConfig): void {
 export function getConfig(): MLflowTracingConfig {
   if (!globalConfig) {
     throw new Error(
-      "MLflow tracing is not configured. Please call configure() with host and experiment_id before using tracing functions."
+      'MLflow tracing is not configured. Please call configure() with host and experiment_id before using tracing functions.'
     );
   }
   return globalConfig;

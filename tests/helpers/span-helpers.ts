@@ -32,7 +32,7 @@ export class MockOtelSpan {
   spanContext() {
     return {
       spanId: this.spanId,
-      traceId: this.traceId,
+      traceId: this.traceId
     };
   }
 }
@@ -55,7 +55,7 @@ export function createTestSpan(
   name: string = 'test-span',
   traceId: string = 'test-trace-id',
   spanId: string = 'test-span-id',
-  spanType: SpanType = SpanType.UNKNOWN,
+  spanType: SpanType = SpanType.UNKNOWN
 ): LiveSpan {
   const mockOtelSpan = createMockOtelSpan(name, spanId, traceId);
   return new LiveSpan(mockOtelSpan as any, traceId, spanType);

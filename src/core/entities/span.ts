@@ -1,10 +1,16 @@
 import { SpanStatusCode as OTelSpanStatusCode } from '@opentelemetry/api';
-import { Span as OTelSpan } from '@opentelemetry/sdk-trace-node';
+import type { Span as OTelSpan } from '@opentelemetry/sdk-trace-node';
 import { SpanAttributeKey, SpanType, NO_OP_SPAN_TRACE_ID } from '../constants';
 import { SpanEvent } from './span_event';
 import { SpanStatus, SpanStatusCode } from './span_status';
-import { convertHrTimeToNanoSeconds, convertNanoSecondsToHrTime, encodeSpanIdToBase64, encodeTraceIdToBase64, decodeIdFromBase64 } from '../utils';
-import { HrTime } from '@opentelemetry/api';
+import {
+  convertHrTimeToNanoSeconds,
+  convertNanoSecondsToHrTime,
+  encodeSpanIdToBase64,
+  encodeTraceIdToBase64,
+  decodeIdFromBase64
+} from '../utils';
+import type { HrTime } from '@opentelemetry/api';
 /**
  * MLflow Span interface
  */
@@ -39,7 +45,7 @@ export interface ISpan {
    * @param key Attribute key
    * @returns Attribute value
    */
-  getAttribute(key: string ): any;
+  getAttribute(key: string): any;
 
   /**
    * Get events from the span
@@ -131,7 +137,7 @@ export class Span implements ISpan {
       return new SpanEvent({
         name: event.name,
         attributes: event.attributes as Record<string, any>,
-        timestamp: seconds * 1_000_000_000 + nanoseconds,
+        timestamp: seconds * 1_000_000_000 + nanoseconds
       });
     });
   }
@@ -152,7 +158,7 @@ export class Span implements ISpan {
         code: this.status?.statusCode || 'UNSET'
       },
       attributes: this.attributes || {},
-      events: this.events.map(event => ({
+      events: this.events.map((event) => ({
         name: event.name,
         time_unix_nano: event.timestamp,
         attributes: event.attributes || {}
@@ -192,12 +198,14 @@ export class Span implements ISpan {
         isRemote: false
       }),
       // Add parentSpanContext for parent span ID
-      parentSpanContext: json.parent_span_id ? {
-        traceId: decodeIdFromBase64(json.trace_id),
-        spanId: decodeIdFromBase64(json.parent_span_id),
-        traceFlags: 1,
-        isRemote: false
-      } : undefined
+      parentSpanContext: json.parent_span_id
+        ? {
+            traceId: decodeIdFromBase64(json.trace_id),
+            spanId: decodeIdFromBase64(json.parent_span_id),
+            traceFlags: 1,
+            isRemote: false
+          }
+        : undefined
     };
 
     // Create a span that behaves like our Span class but from downloaded data
@@ -211,8 +219,10 @@ export class Span implements ISpan {
  * @returns OpenTelemetry compatible status code
  */
 function convertStatusCodeToOTel(statusCode?: string): OTelSpanStatusCode {
-  if (!statusCode) return OTelSpanStatusCode.UNSET;
-  
+  if (!statusCode) {
+    return OTelSpanStatusCode.UNSET;
+  }
+
   // Handle MLflow format -> OTel format conversion
   switch (statusCode) {
     case 'STATUS_CODE_OK':
@@ -239,7 +249,6 @@ export class LiveSpan extends Span {
     this.setAttribute(SpanAttributeKey.TRACE_ID, traceId);
     this.setAttribute(SpanAttributeKey.SPAN_TYPE, span_type);
   }
-
 
   /**
    * Set inputs for the span
@@ -271,7 +280,9 @@ export class LiveSpan extends Span {
    * @param attributes Object containing key-value pairs for attributes
    */
   setAttributes(attributes: Record<string, any>): void {
-    if (!attributes) return;
+    if (!attributes) {
+      return;
+    }
 
     Object.entries(attributes).forEach(([key, value]) => {
       this.setAttribute(key, value);
@@ -318,14 +329,12 @@ export class LiveSpan extends Span {
    * @param status Optional status code
    * @param endTimeNs Optional end time in nanoseconds
    */
-  end(
-    options?: {
-      outputs?: any,
-      attributes?: Record<string, any>,
-      status?: SpanStatus | SpanStatusCode,
-      endTimeNs?: number
-    }
-  ): void {
+  end(options?: {
+    outputs?: any;
+    attributes?: Record<string, any>;
+    status?: SpanStatus | SpanStatusCode;
+    endTimeNs?: number;
+  }): void {
     if (options?.outputs !== undefined) {
       this.setOutputs(options.outputs);
     }
@@ -346,7 +355,7 @@ export class LiveSpan extends Span {
       this.setStatus(SpanStatusCode.OK);
     }
 
-    const endTime = (options?.endTimeNs) ? convertNanoSecondsToHrTime(options.endTimeNs) : undefined;
+    const endTime = options?.endTimeNs ? convertNanoSecondsToHrTime(options.endTimeNs) : undefined;
     this._span.end(endTime);
   }
 }
@@ -361,26 +370,53 @@ export class NoOpSpan implements LiveSpan {
   constructor(span?: any) {
     // Create a minimal no-op span object
     this._span = span || {
-      spanContext: () => ({ spanId: '0000000000000000', traceId: '00000000000000000000000000000000' }),
+      spanContext: () => ({
+        spanId: '0000000000000000',
+        traceId: '00000000000000000000000000000000'
+      }),
       attributes: {},
       events: []
     };
     this._attributesRegistry = new _SpanAttributesRegistry(this._span);
   }
 
-  get traceId(): string { return NO_OP_SPAN_TRACE_ID; }
-  get spanId(): string { return ''; }
-  get parentId(): string | null { return null; }
-  get name(): string { return ''; }
-  get spanType(): SpanType { return SpanType.UNKNOWN; }
-  get startTime(): HrTime { return [0, 0]; }
-  get endTime(): HrTime | null { return null; }
-  get status(): SpanStatus { return new SpanStatus(SpanStatusCode.UNSET); }
-  get inputs(): any { return null; }
-  get outputs(): any { return null; }
-  get attributes(): Record<string, any> { return {}; }
+  get traceId(): string {
+    return NO_OP_SPAN_TRACE_ID;
+  }
+  get spanId(): string {
+    return '';
+  }
+  get parentId(): string | null {
+    return null;
+  }
+  get name(): string {
+    return '';
+  }
+  get spanType(): SpanType {
+    return SpanType.UNKNOWN;
+  }
+  get startTime(): HrTime {
+    return [0, 0];
+  }
+  get endTime(): HrTime | null {
+    return null;
+  }
+  get status(): SpanStatus {
+    return new SpanStatus(SpanStatusCode.UNSET);
+  }
+  get inputs(): any {
+    return null;
+  }
+  get outputs(): any {
+    return null;
+  }
+  get attributes(): Record<string, any> {
+    return {};
+  }
 
-  getAttribute(key: string): any { return null; }
+  getAttribute(key: string): any {
+    return null;
+  }
 
   // Implement all methods to do nothing
   setInputs(_inputs: any): void {}
@@ -390,7 +426,12 @@ export class NoOpSpan implements LiveSpan {
   setStatus(_status: SpanStatus | SpanStatusCode | string, _description?: string): void {}
   addEvent(_event: SpanEvent): void {}
   recordException(_error: Error): void {}
-  end(_outputs?: any, _attributes?: Record<string, any>, _status?: SpanStatus | SpanStatusCode, _endTimeNs?: number): void {}
+  end(
+    _outputs?: any,
+    _attributes?: Record<string, any>,
+    _status?: SpanStatus | SpanStatusCode,
+    _endTimeNs?: number
+  ): void {}
 
   get events(): SpanEvent[] {
     return [];
@@ -400,8 +441,6 @@ export class NoOpSpan implements LiveSpan {
     return {};
   }
 }
-
-
 
 /**
  * A utility class to manage the span attributes.
@@ -424,7 +463,7 @@ class _SpanAttributesRegistry {
   getAll(): Record<string, any> {
     const result: Record<string, any> = {};
     if (this._span.attributes) {
-      Object.keys(this._span.attributes).forEach(key => {
+      Object.keys(this._span.attributes).forEach((key) => {
         result[key] = this.get(key);
       });
     }
@@ -526,5 +565,5 @@ export function createMlflowSpan(
     return new Span(otelSpan);
   }
 
-  return new LiveSpan(otelSpan, traceId, spanType as SpanType || SpanType.UNKNOWN);
+  return new LiveSpan(otelSpan, traceId, (spanType as SpanType) || SpanType.UNKNOWN);
 }

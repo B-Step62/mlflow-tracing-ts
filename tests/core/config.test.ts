@@ -193,7 +193,7 @@ token = test-token-123
       mockFs.readFileSync.mockReturnValue(mockConfigContent);
 
       const result = readDatabricksConfig('/path/to/.databrickscfg');
-      
+
       expect(result.host).toBe('https://test-workspace.databricks.com');
       expect(result.token).toBe('test-token-123');
     });
@@ -213,7 +213,7 @@ token = prod-token-456
       mockFs.readFileSync.mockReturnValue(mockConfigContent);
 
       const result = readDatabricksConfig('/path/to/.databrickscfg', 'production');
-      
+
       expect(result.host).toBe('https://prod-workspace.databricks.com');
       expect(result.token).toBe('prod-token-456');
     });

@@ -9,13 +9,7 @@
  * Type definition for attribute values that can be stored in span events.
  * Compatible with OpenTelemetry attribute value types.
  */
-export type AttributeValue =
-  | string
-  | number
-  | boolean
-  | string[]
-  | number[]
-  | boolean[];
+export type AttributeValue = string | number | boolean | string[] | number[] | boolean[];
 
 /**
  * Parameters for creating a SpanEvent instance.
@@ -124,7 +118,7 @@ export class SpanEvent {
       attributes: {
         'exception.message': exception.message,
         'exception.type': exception.constructor.name,
-        'exception.stacktrace': stackTrace,
+        'exception.stacktrace': stackTrace
       }
     });
   }

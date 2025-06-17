@@ -146,10 +146,7 @@ Defines the allowed types for assessment values:
 
 ```typescript
 type PbValueType = number | string | boolean;
-type AssessmentValueType = 
-  | PbValueType 
-  | { [key: string]: PbValueType } 
-  | PbValueType[];
+type AssessmentValueType = PbValueType | { [key: string]: PbValueType } | PbValueType[];
 ```
 
 ### `AssessmentSourceType`
@@ -275,4 +272,4 @@ Run tests with:
 
 ```bash
 npm test src/core/entities/__tests__/assessment.test.ts
-``` 
+```

@@ -1,9 +1,10 @@
 import { trace, context } from '@opentelemetry/api';
-import { Span as OTelSpan } from '@opentelemetry/sdk-trace-node';
-import { SpanType } from "./constants";
-import { createMlflowSpan, LiveSpan, NoOpSpan } from "./entities/span";
-import { getTracer } from "./provider";
-import { InMemoryTraceManager } from "./trace_manager";
+import type { Span as OTelSpan } from '@opentelemetry/sdk-trace-node';
+import type { SpanType } from './constants';
+import type { LiveSpan } from './entities/span';
+import { createMlflowSpan, NoOpSpan } from './entities/span';
+import { getTracer } from './provider';
+import { InMemoryTraceManager } from './trace_manager';
 import { convertNanoSecondsToHrTime, getMlflowTraceIdFromOtelSpan } from './utils';
 
 /**
@@ -17,13 +18,13 @@ import { convertNanoSecondsToHrTime, getMlflowTraceIdFromOtelSpan } from './util
  * @param parent The parent span object.
  */
 export interface SpanOptions {
-    name?: string;
-    span_type?: SpanType;
-    inputs?: any;
-    attributes?: Record<string, any>;
-    startTimeNs?: number;
-    parent?: LiveSpan;
-  }
+  name?: string;
+  span_type?: SpanType;
+  inputs?: any;
+  attributes?: Record<string, any>;
+  startTimeNs?: number;
+  parent?: LiveSpan;
+}
 
 /**
  * Start a new span with the given name and span type.
@@ -32,35 +33,40 @@ export interface SpanOptions {
  * The span must be ended by calling `end` method on the returned Span object.
  */
 export function startSpan(options: SpanOptions): LiveSpan {
-    try {
-        const tracer = getTracer('default');
+  try {
+    const tracer = getTracer('default');
 
-        // If parent is provided, use it as the parent span
-        let parentContext = context.active();
-        if (options.parent) {
-            parentContext = trace.setSpan(parentContext, options.parent._span);
-        }
-
-        // Convert startTimeNs to OTel format
-        const startTime = (options.startTimeNs) ? convertNanoSecondsToHrTime(options.startTimeNs) : undefined;
-
-        const otelSpan = tracer.startSpan(options.name || 'span', {startTime: startTime}, parentContext) as OTelSpan;
-
-        // Create and register the MLflow span
-        const mlflowSpan = createAndRegisterMlflowSpan(
-          otelSpan,
-          options.span_type,
-          options.inputs,
-          options.attributes
-        );
-
-        return mlflowSpan;
-    } catch (error) {
-        console.warn("Failed to start span", error);
-        return new NoOpSpan();
+    // If parent is provided, use it as the parent span
+    let parentContext = context.active();
+    if (options.parent) {
+      parentContext = trace.setSpan(parentContext, options.parent._span);
     }
-}
 
+    // Convert startTimeNs to OTel format
+    const startTime = options.startTimeNs
+      ? convertNanoSecondsToHrTime(options.startTimeNs)
+      : undefined;
+
+    const otelSpan = tracer.startSpan(
+      options.name || 'span',
+      { startTime: startTime },
+      parentContext
+    ) as OTelSpan;
+
+    // Create and register the MLflow span
+    const mlflowSpan = createAndRegisterMlflowSpan(
+      otelSpan,
+      options.span_type,
+      options.inputs,
+      options.attributes
+    );
+
+    return mlflowSpan;
+  } catch (error) {
+    console.warn('Failed to start span', error);
+    return new NoOpSpan();
+  }
+}
 
 /**
  * Execute a function within a span context. The span is automatically started before
@@ -77,9 +83,7 @@ export function startSpan(options: SpanOptions): LiveSpan {
  * @param callback The callback function (when options are provided)
  * @returns The result of the callback function
  */
-export function withSpan<T>(
-  callback: (span: LiveSpan) => T | Promise<T>
-): T | Promise<T>;
+export function withSpan<T>(callback: (span: LiveSpan) => T | Promise<T>): T | Promise<T>;
 export function withSpan<T>(
   options: Omit<SpanOptions, 'parent'>,
   callback: (span: LiveSpan) => T | Promise<T>
@@ -90,69 +94,69 @@ export function withSpan<T>(
 ): T | Promise<T> {
   // Determine if first argument is options or callback
   const isOptionsProvided = typeof optionsOrCallback === 'object' && optionsOrCallback !== null;
-  const spanOptions: Omit<SpanOptions, 'parent'> = isOptionsProvided ? optionsOrCallback as Omit<SpanOptions, 'parent'> : {};
-  const actualCallback = isOptionsProvided ? callback! : optionsOrCallback as (span: LiveSpan) => T | Promise<T>;
+  const spanOptions: Omit<SpanOptions, 'parent'> = isOptionsProvided ? optionsOrCallback : {};
+  const actualCallback = isOptionsProvided
+    ? callback!
+    : (optionsOrCallback as (span: LiveSpan) => T | Promise<T>);
 
   // Generate a default span name if not provided
   const spanName = spanOptions.name || 'span';
 
-const tracer = getTracer('default');
+  const tracer = getTracer('default');
 
-// Convert startTimeNs to OTel format if provided
-const startTime = spanOptions.startTimeNs ? convertNanoSecondsToHrTime(spanOptions.startTimeNs) : undefined;
+  // Convert startTimeNs to OTel format if provided
+  const startTime = spanOptions.startTimeNs
+    ? convertNanoSecondsToHrTime(spanOptions.startTimeNs)
+    : undefined;
 
-// Use startActiveSpan to automatically manage context and parent-child relationships
-return tracer.startActiveSpan(
-    spanName,
-    { startTime },
-    (otelSpan) => {
+  // Use startActiveSpan to automatically manage context and parent-child relationships
+  return tracer.startActiveSpan(spanName, { startTime }, (otelSpan) => {
     // Create and register the MLflow span
     const mlflowSpan = createAndRegisterMlflowSpan(
-        otelSpan as OTelSpan,
-        spanOptions.span_type,
-        spanOptions.inputs,
-        spanOptions.attributes
+      otelSpan as OTelSpan,
+      spanOptions.span_type,
+      spanOptions.inputs,
+      spanOptions.attributes
     );
 
     try {
-        // Execute the callback with the span
-        const result = actualCallback(mlflowSpan);
+      // Execute the callback with the span
+      const result = actualCallback(mlflowSpan);
 
-        // Handle both sync and async results
-        if (result instanceof Promise) {
+      // Handle both sync and async results
+      if (result instanceof Promise) {
         return result
-            .then((value) => {
+          .then((value) => {
             // Set outputs if they are not already set
             if (mlflowSpan.outputs === undefined) {
-                mlflowSpan.setOutputs(value);
+              mlflowSpan.setOutputs(value);
             }
             mlflowSpan.end();
             return value;
-            })
-            .catch((error) => {
+          })
+          .catch((error) => {
             // Set error status and re-throw
             mlflowSpan.setStatus('ERROR', error.message);
             mlflowSpan.recordException(error);
             mlflowSpan.end();
             throw error;
-            });
-        } else {
+          });
+      } else {
         // Synchronous execution
         if (mlflowSpan.outputs === undefined) {
-            mlflowSpan.setOutputs(result);
+          mlflowSpan.setOutputs(result);
         }
         mlflowSpan.end();
         return result;
-        }
+      }
     } catch (error) {
-        // Handle synchronous errors - use the already created span
-        mlflowSpan.setStatus('ERROR', (error as Error).message);
-        mlflowSpan.recordException(error as Error);
-        mlflowSpan.end();
-        throw error;
+      // Handle synchronous errors - use the already created span
+      mlflowSpan.setStatus('ERROR', (error as Error).message);
+      mlflowSpan.recordException(error as Error);
+      mlflowSpan.end();
+      throw error;
     }
-    }
-  );
+  });
 }
 
 /**
@@ -164,29 +168,29 @@ return tracer.startActiveSpan(
  * @returns The created and registered MLflow LiveSpan
  */
 function createAndRegisterMlflowSpan(
-    otelSpan: OTelSpan,
-    spanType?: SpanType,
-    inputs?: any,
-    attributes?: Record<string, any>
-  ): LiveSpan {
-    // Get the trace ID from the span
-    const traceId = getMlflowTraceIdFromOtelSpan(otelSpan);
+  otelSpan: OTelSpan,
+  spanType?: SpanType,
+  inputs?: any,
+  attributes?: Record<string, any>
+): LiveSpan {
+  // Get the trace ID from the span
+  const traceId = getMlflowTraceIdFromOtelSpan(otelSpan);
 
-    // Create the MLflow span from the OTel span
-    const mlflowSpan = createMlflowSpan(otelSpan, traceId, spanType) as LiveSpan;
+  // Create the MLflow span from the OTel span
+  const mlflowSpan = createMlflowSpan(otelSpan, traceId, spanType) as LiveSpan;
 
-    // Set initial properties if provided
-    if (inputs) {
-      mlflowSpan.setInputs(inputs);
-    }
-
-    if (attributes) {
-      mlflowSpan.setAttributes(attributes);
-    }
-
-    // Register the span with the trace manager
-    const traceManager = InMemoryTraceManager.getInstance();
-    traceManager.registerSpan(mlflowSpan);
-
-    return mlflowSpan;
+  // Set initial properties if provided
+  if (inputs) {
+    mlflowSpan.setInputs(inputs);
   }
+
+  if (attributes) {
+    mlflowSpan.setAttributes(attributes);
+  }
+
+  // Register the span with the trace manager
+  const traceManager = InMemoryTraceManager.getInstance();
+  traceManager.registerSpan(mlflowSpan);
+
+  return mlflowSpan;
+}

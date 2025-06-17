@@ -15,7 +15,7 @@ export enum TraceLocationType {
   /**
    * Trace is stored in a Databricks inference table
    */
-  INFERENCE_TABLE = 'INFERENCE_TABLE',
+  INFERENCE_TABLE = 'INFERENCE_TABLE'
 }
 
 /**
