@@ -3,27 +3,50 @@ import { Tracer } from "@opentelemetry/api";
 import { MlflowSpanExporter, MlflowSpanProcessor } from "../exporters/mlflow";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { MlflowClient } from "../clients";
-import { configure, getConfig } from "./config";
+import { getConfig } from "./config";
 
+let sdkInitialized = false;
+let sdk: NodeSDK | null = null;
 
-// TODO: Implement branching logic to actually set span processor and exporter
+function initializeSDK(): void {
+    if (sdkInitialized) {
+        return;
+    }
 
-configure({
-    tracking_uri: process.env.MLFLOW_TRACKING_URI!,
-    experiment_id: process.env.MLFLOW_EXPERIMENT_ID!,
-    databricks_config_path: process.env.DATABRICKS_CONFIG_PATH,
-});
+    try {
+        const hostConfig = getConfig();
+        if (!hostConfig.host || !hostConfig.token) {
+            console.warn("MLflow tracing not configured. Call configure() before using tracing APIs.");
+            return;
+        }
 
-const hostConfig = getConfig();
-const exporter = new MlflowSpanExporter(new MlflowClient({
-    host: hostConfig.host!,
-    token: hostConfig.token!
-}));
+        const exporter = new MlflowSpanExporter(new MlflowClient({
+            host: hostConfig.host,
+            token: hostConfig.token
+        }));
 
-const processor = new MlflowSpanProcessor(exporter);
-const sdk = new NodeSDK({spanProcessors: [processor]});
-sdk.start();
+        const processor = new MlflowSpanProcessor(exporter);
+        sdk = new NodeSDK({spanProcessors: [processor]});
+        sdk.start();
+        sdkInitialized = true;
+    } catch (error) {
+        console.warn("Failed to initialize MLflow tracing:", error);
+    }
+}
 
+export function reinitializeSDK(): void {
+    if (sdk) {
+        try {
+            sdk.shutdown();
+        } catch (error) {
+            console.warn("Error shutting down existing SDK:", error);
+        }
+    }
+
+    sdkInitialized = false;
+    sdk = null;
+    initializeSDK();
+}
 
 export function getTracer(module_name: string): Tracer {
     return opentelemetry.trace.getTracer(module_name);

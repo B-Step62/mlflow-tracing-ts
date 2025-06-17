@@ -1,7 +1,29 @@
 {
-  "name": "mlflow-tracing-ts",
+  "name": "mlflow-tracing",
   "version": "0.1.0",
-  "description": "TypeScript implementation of MLflow Tracing for LLM observability",
+  "description": "TypeScript implementation of MLflow Tracing SDK for LLM observability",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mlflow/mlflow.git"
+  },
+  "homepage": "https://mlflow.org/",
+  "author": {
+    "name": "MLflow",
+    "url": "https://mlflow.org/"
+  },
+  "bugs": {
+    "url": "https://github.com/mlflow/mlflow/issues"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "mlflow",
+    "tracing",
+    "observability",
+    "opentelemetry",
+    "llm",
+    "javascript",
+    "typescript"
+  ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -14,24 +36,9 @@
     "format:check": "prettier --check .",
     "prepare": "npm run build"
   },
-  "keywords": [
-    "mlflow",
-    "tracing",
-    "observability",
-    "opentelemetry",
-    "llm",
-    "typescript"
-  ],
-  "author": "",
-  "license": "Apache-2.0",
   "dependencies": {
-    "@opentelemetry/api": "^1.4.1",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.41.0",
-    "@opentelemetry/resources": "^1.15.0",
-    "@opentelemetry/sdk-node": "^0.202.0",
-    "@opentelemetry/sdk-trace-base": "^1.30.1",
-    "@opentelemetry/sdk-trace-node": "^2.0.1",
-    "@opentelemetry/semantic-conventions": "^1.15.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-node": "^0.201.1",
     "ini": "^5.0.0"
   },
   "devDependencies": {
@@ -47,11 +54,10 @@
     "typescript": "^5.8.3"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18"
   },
   "files": [
     "dist",
-    "LICENSE",
     "README.md",
     "package.json"
   ]

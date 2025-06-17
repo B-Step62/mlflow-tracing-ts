@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { parse as parseIni } from "ini";
+import { reinitializeSDK } from "./provider";
 
 /**
  * Configuration options for the MLflow tracing SDK
@@ -144,6 +145,9 @@ export function configure(config: MLflowTracingConfig): void {
   }
 
   globalConfig = { ...config };
+
+  // Initialize SDK with new configuration
+  reinitializeSDK();
 }
 
 /**

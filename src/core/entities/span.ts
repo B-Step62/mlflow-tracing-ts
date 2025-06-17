@@ -1,10 +1,9 @@
-import { NonRecordingSpan } from '@opentelemetry/api/build/src/trace/NonRecordingSpan';
-import { Span as OTelSpan } from '@opentelemetry/sdk-trace-node';
 import { SpanStatusCode as OTelSpanStatusCode } from '@opentelemetry/api';
+import { Span as OTelSpan } from '@opentelemetry/sdk-trace-node';
 import { SpanAttributeKey, SpanType, NO_OP_SPAN_TRACE_ID } from '../constants';
 import { SpanEvent } from './span_event';
 import { SpanStatus, SpanStatusCode } from './span_status';
-import { convertHrTimeToNanoSeconds, convertNanoSecondsToHrTime, encodeSpanIdToBase64, decodeSpanIdFromBase64 } from '../utils';
+import { convertHrTimeToNanoSeconds, convertNanoSecondsToHrTime, encodeSpanIdToBase64, encodeTraceIdToBase64, decodeIdFromBase64 } from '../utils';
 import { HrTime } from '@opentelemetry/api';
 /**
  * MLflow Span interface
@@ -52,21 +51,6 @@ export interface ISpan {
    * @returns JSON object representation of the span
    */
   toJson(): any;
-
-  // Optional methods for mutable spans (LiveSpan)
-  setInputs?(inputs: any): void;
-  setOutputs?(outputs: any): void;
-  setAttribute?(key: string, value: any): void;
-  setAttributes?(attributes: Record<string, any>): void;
-  setStatus?(status: SpanStatus | SpanStatusCode | string, description?: string): void;
-  addEvent?(event: SpanEvent): void;
-  recordException?(error: Error): void;
-  end?(options?: {
-    outputs?: any,
-    attributes?: Record<string, any>,
-    status?: SpanStatus | SpanStatusCode,
-    endTimeNs?: number
-  }): void;
 }
 
 /**
@@ -158,6 +142,7 @@ export class Span implements ISpan {
    */
   toJson(): any {
     return {
+      trace_id: encodeTraceIdToBase64(this.traceId),
       span_id: encodeSpanIdToBase64(this.spanId),
       parent_span_id: this.parentId ? encodeSpanIdToBase64(this.parentId) : undefined,
       name: this.name,
@@ -182,7 +167,7 @@ export class Span implements ISpan {
   static fromJson(json: any): ISpan {
     // Convert the JSON data back to an OpenTelemetry-like span structure
     // This is simplified compared to Python but follows the same pattern
-    
+
     const otelSpanData = {
       name: json.name,
       startTime: convertNanoSecondsToHrTime(json.start_time_unix_nano),
@@ -201,15 +186,15 @@ export class Span implements ISpan {
       ended: true,
       // Add spanContext() method that returns proper SpanContext
       spanContext: () => ({
-        traceId: json.trace_id,
-        spanId: decodeSpanIdFromBase64(json.span_id),
+        traceId: decodeIdFromBase64(json.trace_id),
+        spanId: decodeIdFromBase64(json.span_id),
         traceFlags: 1, // Sampled
         isRemote: false
       }),
       // Add parentSpanContext for parent span ID
       parentSpanContext: json.parent_span_id ? {
-        traceId: json.trace_id,
-        spanId: decodeSpanIdFromBase64(json.parent_span_id),
+        traceId: decodeIdFromBase64(json.trace_id),
+        spanId: decodeIdFromBase64(json.parent_span_id),
         traceFlags: 1,
         isRemote: false
       } : undefined
@@ -374,9 +359,13 @@ export class NoOpSpan implements LiveSpan {
   readonly _span: any; // Use any for NoOp span to avoid type conflicts
   readonly _attributesRegistry: _SpanAttributesRegistry;
 
-  constructor(span?: NonRecordingSpan) {
+  constructor(span?: any) {
     // Create a minimal no-op span object
-    this._span = span || new NonRecordingSpan();
+    this._span = span || {
+      spanContext: () => ({ spanId: '0000000000000000', traceId: '00000000000000000000000000000000' }),
+      attributes: {},
+      events: []
+    };
     this._attributesRegistry = new _SpanAttributesRegistry(this._span);
   }
 
@@ -452,7 +441,7 @@ class _SpanAttributesRegistry {
       try {
         return JSON.parse(serializedValue);
       } catch (e) {
-        // If JSON.parse fails, this might be a raw string value or 
+        // If JSON.parse fails, this might be a raw string value or
         // the span was created from JSON (attributes already parsed)
         // In that case, return the value as-is
         return serializedValue;
@@ -526,8 +515,10 @@ export function createMlflowSpan(
   otelSpan: any,
   traceId: string,
   spanType?: string
-): ISpan {
-  if (!otelSpan || otelSpan instanceof NonRecordingSpan) {
+): NoOpSpan | Span | LiveSpan {
+  // NonRecordingSpan always has a spanId of '0000000000000000'
+  // https://github.com/open-telemetry/opentelemetry-js/blob/f2cfd1327a5b131ea795301b10877291aac4e6f5/api/src/trace/invalid-span-constants.ts#L23C32-L23C48
+  if (!otelSpan || otelSpan.spanContext().spanId === '0000000000000000') {
     return new NoOpSpan(otelSpan);
   }
 

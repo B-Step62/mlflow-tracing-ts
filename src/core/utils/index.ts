@@ -84,15 +84,35 @@ export function getMlflowTraceIdFromOtelSpan(otelSpan: OTelSpan): string {
 export function encodeSpanIdToBase64(spanId: string): string {
     // Convert hex string to bytes (8 bytes for span ID)
     const bytes = new Uint8Array(8);
-    
+
     // Parse hex string (remove any padding to 16 chars)
     const hexStr = spanId.padStart(16, '0');
     for (let i = 0; i < 8; i++) {
         bytes[i] = parseInt(hexStr.substr(i * 2, 2), 16);
     }
-    
+
     // Convert to base64
     return Buffer.from(bytes).toString('base64');
+}
+
+/**
+ * Convert a hex span ID to base64 format for JSON serialization
+ * Following Python implementation: _encode_trace_id_to_byte
+ * @param spanId Hex string span ID (32 chars)
+ * @returns Base64 encoded span ID
+ */
+export function encodeTraceIdToBase64(traceId: string): string {
+  // Convert hex string to bytes (16 bytes for trace ID)
+  const bytes = new Uint8Array(16);
+
+  // Parse hex string (remove any padding to 32 chars)
+  const hexStr = traceId.padStart(32, '0');
+  for (let i = 0; i < 16; i++) {
+    bytes[i] = parseInt(hexStr.substr(i * 2, 2), 16);
+  }
+
+  // Convert to base64
+  return Buffer.from(bytes).toString('base64');
 }
 
 /**
@@ -101,10 +121,10 @@ export function encodeSpanIdToBase64(spanId: string): string {
  * @param base64SpanId Base64 encoded span ID
  * @returns Hex string span ID
  */
-export function decodeSpanIdFromBase64(base64SpanId: string): string {
+export function decodeIdFromBase64(base64SpanId: string): string {
     // Decode from base64
     const bytes = Buffer.from(base64SpanId, 'base64');
-    
+
     // Convert to hex string
     return Array.from(bytes)
         .map(b => b.toString(16).padStart(2, '0'))
